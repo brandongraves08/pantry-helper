@@ -52,3 +52,57 @@ class InventoryOverride(BaseModel):
     item_name: str
     count_estimate: int
     notes: Optional[str] = None
+
+# Device Management Schemas
+
+class DeviceCreate(BaseModel):
+    """Request to create a new device"""
+    name: str
+    device_id: Optional[str] = None  # Auto-generated if not provided
+
+
+class DeviceUpdate(BaseModel):
+    """Request to update device settings"""
+    name: Optional[str] = None
+    enabled: Optional[bool] = None
+
+
+class DeviceResponse(BaseModel):
+    """Device information response"""
+    id: str
+    name: str
+    created_at: datetime
+    last_seen_at: Optional[datetime] = None
+    battery_v: Optional[float] = None
+    battery_pct: Optional[float] = None
+    rssi: Optional[int] = None
+    total_captures: int = 0
+    failed_uploads: int = 0
+    status: str  # active, idle, inactive, offline
+    device_token: Optional[str] = None  # Only returned on creation
+
+
+class DeviceListResponse(BaseModel):
+    """Paginated list of devices"""
+    items: List[DeviceResponse]
+    total: int
+    skip: int
+    limit: int
+
+
+class DeviceHealthResponse(BaseModel):
+    """Detailed device health metrics"""
+    device_id: str
+    is_healthy: bool
+    battery_v: Optional[float] = None
+    battery_pct: Optional[float] = None
+    rssi: Optional[int] = None
+    last_seen_at: Optional[datetime] = None
+    last_seen_ago_seconds: Optional[int] = None
+    total_captures: int
+    captures_7d: int
+    captures_24h: int
+    successful_7d: int
+    failed_7d: int
+    analyzing_7d: int
+    success_rate_7d: float

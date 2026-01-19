@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from app.api.routes import ingest, inventory, admin
+from app.api.routes import ingest, inventory, admin, devices, advanced_inventory
 from app.db.database import engine, Base
 from app.exceptions import PantryException
 from app.middleware.rate_limit import RateLimitMiddleware
@@ -50,6 +50,8 @@ app.add_middleware(
 # Include routers
 app.include_router(ingest.router, prefix="/v1", tags=["ingest"])
 app.include_router(inventory.router, prefix="/v1", tags=["inventory"])
+app.include_router(advanced_inventory.router, prefix="/v1", tags=["advanced_inventory"])
+app.include_router(devices.router, prefix="/v1", tags=["devices"])
 app.include_router(admin.router, prefix="/v1", tags=["admin"])
 
 @app.get("/health")

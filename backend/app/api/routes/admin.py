@@ -257,3 +257,133 @@ async def get_queue_info():
     except Exception as e:
         logger.error(f"Error getting stats: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/admin/storage/stats")
+async def get_storage_stats():
+    """Get storage statistics and usage information."""
+    logger.info("Getting storage statistics...")
+    
+    try:
+        from app.services.storage import get_storage_manager
+        storage_mgr = get_storage_manager()
+        stats = storage_mgr.get_storage_stats()
+        
+        return {
+            "status": "ok",
+            "storage": stats,
+        }
+    except Exception as e:
+        logger.error(f"Error getting storage stats: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/admin/storage/cleanup")
+async def cleanup_storage(
+    days: int = Query(30, ge=1, le=365),
+    dry_run: bool = Query(False),
+):
+    """
+    Enforce image retention policy and cleanup old images.
+    
+    Parameters:
+    - days: Keep images newer than this many days
+    - dry_run: If True, only report what would be deleted (not implemented in v1)
+    """
+    logger.info(f"Cleanup storage requested (days={days})")
+    
+    try:
+        from app.workers.retention import get_retention_enforcer
+        enforcer = get_retention_enforcer()
+        
+        # Override retention if specified
+        original_retention = enforcer.retention_days
+        enforcer.retention_days = days
+        
+        result = enforcer.enforce_retention()
+        
+        # Restore original retention
+        enforcer.retention_days = original_retention
+        
+        return {
+            "status": "success" if result["success"] else "error",
+            "result": result,
+        }
+    except Exception as e:
+        logger.error(f"Error during cleanup: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/admin/storage/cleanup-failed")
+async def cleanup_failed_captures(
+    days: int = Query(7, ge=1, le=365),
+):
+    """
+    Clean up images from failed captures older than X days.
+    
+    Parameters:
+    - days: Delete failed capture images older than this many days
+    """
+    logger.info(f"Cleanup failed captures requested (days={days})")
+    
+    try:
+        from app.workers.retention import get_retention_enforcer
+        enforcer = get_retention_enforcer()
+        result = enforcer.cleanup_failed_captures(days=days)
+        
+        return {
+            "status": "success" if result["success"] else "error",
+            "result": result,
+        }
+    except Exception as e:
+        logger.error(f"Error during failed cleanup: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/admin/storage/check-quota")
+async def check_storage_quota(
+    max_mb: int = Query(5000, ge=100, le=100000),
+):
+    """
+    Check storage quota and trigger cleanup if needed.
+    
+    Parameters:
+    - max_mb: Maximum storage allowed in MB
+    """
+    logger.info(f"Checking storage quota (limit={max_mb} MB)...")
+    
+    try:
+        from app.workers.retention import get_retention_enforcer
+        enforcer = get_retention_enforcer()
+        result = enforcer.check_storage_quota(max_storage_mb=max_mb)
+        
+        return {
+            "status": "ok",
+            "result": result,
+        }
+    except Exception as e:
+        logger.error(f"Error checking quota: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/admin/storage/cleanup-orphans")
+async def cleanup_orphaned_images():
+    """
+    Delete orphaned images (files without corresponding DB records).
+    
+    This is useful after manual database maintenance or failed uploads.
+    """
+    logger.info("Cleaning orphaned images...")
+    
+    try:
+        from app.services.storage import get_storage_manager
+        storage_mgr = get_storage_manager()
+        deleted = storage_mgr.cleanup_orphaned_images()
+        
+        return {
+            "status": "success",
+            "deleted_count": deleted,
+        }
+    except Exception as e:
+        logger.error(f"Error cleaning orphans: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))

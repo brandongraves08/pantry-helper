@@ -45,6 +45,11 @@ class Settings(BaseSettings):
     # Image Processing Configuration
     MAX_IMAGE_SIZE: int = 20 * 1024 * 1024  # 20 MB
     ALLOWED_IMAGE_TYPES: list = ["image/jpeg", "image/png", "image/webp"]
+    
+    # Storage Configuration
+    STORAGE_PATH: str = os.getenv("STORAGE_PATH", "./storage")
+    IMAGE_RETENTION_DAYS: int = int(os.getenv("IMAGE_RETENTION_DAYS", "30"))
+    MAX_STORAGE_MB: int = int(os.getenv("MAX_STORAGE_MB", "5000"))
 
     # Logging Configuration
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
