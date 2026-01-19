@@ -1,10 +1,12 @@
 """Celery task queue configuration and task definitions."""
 
 from celery import Celery, Task
-from app.config import settings
+from app.config import Settings
 import logging
 
 logger = logging.getLogger(__name__)
+
+settings = Settings()
 
 # Initialize Celery app
 celery_app = Celery(
@@ -60,62 +62,43 @@ def process_image_capture(self, capture_id: str) -> dict:
         dict: Processing result with observation_id and status
     """
     from app.db.session import SessionLocal
-    from app.db.models import Capture, CaptureStatus
-    from app.services.vision import VisionAnalyzer
+    from app.db.models import Capture
+    from app.workers.capture import CaptureProcessor
 
+    db = None
     try:
         db = SessionLocal()
+        processor = CaptureProcessor()
+        success = processor.process_capture(capture_id)
         
-        # Get capture record
-        capture = db.query(Capture).filter(Capture.id == capture_id).first()
-        if not capture:
-            raise ValueError(f"Capture {capture_id} not found")
-
-        # Update status to processing
-        capture.status = CaptureStatus.PROCESSING
-        db.commit()
-
-        # Process image
-        analyzer = VisionAnalyzer()
-        result = analyzer.analyze_image(capture.image_data)
-
-        # Create observation record
-        from app.db.models import Observation
-        observation = Observation(
-            capture_id=capture.id,
-            device_id=capture.device_id,
-            raw_json=result,
-        )
-        db.add(observation)
-        
-        # Update capture status
-        capture.status = CaptureStatus.COMPLETED
-        db.commit()
-
-        logger.info(f"Processed capture {capture_id} successfully")
-        return {
-            "capture_id": capture_id,
-            "observation_id": observation.id,
-            "status": "completed",
-        }
+        if success:
+            logger.info(f"Processed capture {capture_id} successfully")
+            return {
+                "capture_id": capture_id,
+                "status": "completed",
+            }
+        else:
+            raise ValueError(f"Processing failed for capture {capture_id}")
 
     except Exception as exc:
         logger.error(f"Error processing capture {capture_id}: {exc}")
         
-        # Retry with exponential backoff
-        try:
-            db = SessionLocal()
-            capture = db.query(Capture).filter(Capture.id == capture_id).first()
-            if capture:
-                capture.status = CaptureStatus.FAILED
-                db.commit()
-        except:
-            pass
+        # Mark capture as failed
+        if db:
+            try:
+                capture = db.query(Capture).filter(Capture.id == capture_id).first()
+                if capture:
+                    capture.status = "failed"
+                    capture.error_message = str(exc)
+                    db.commit()
+            except:
+                pass
         
         raise self.retry(exc=exc, countdown=min(2 ** self.request.retries, 600))
 
     finally:
-        db.close()
+        if db:
+            db.close()
 
 
 @celery_app.task(bind=True, base=DatabaseTask, max_retries=settings.MAX_RETRIES)
@@ -127,14 +110,15 @@ def process_pending_captures(self) -> dict:
         dict: Summary of processed captures
     """
     from app.db.session import SessionLocal
-    from app.db.models import Capture, CaptureStatus
+    from app.db.models import Capture
 
+    db = None
     try:
         db = SessionLocal()
         
         # Find pending captures
         pending = db.query(Capture).filter(
-            Capture.status == CaptureStatus.PENDING
+            Capture.status == "stored"
         ).all()
 
         processed_count = 0
@@ -157,7 +141,8 @@ def process_pending_captures(self) -> dict:
         raise self.retry(exc=exc, countdown=min(2 ** self.request.retries, 600))
 
     finally:
-        db.close()
+        if db:
+            db.close()
 
 
 @celery_app.task

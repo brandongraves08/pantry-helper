@@ -5,7 +5,6 @@ from sqlalchemy.orm import Session
 from app.db.session import SessionLocal
 from app.db.models import (
     Capture,
-    CaptureStatus,
     Device,
     Observation,
     InventoryEvent,
@@ -236,33 +235,24 @@ async def cancel_task(task_id: str):
 @router.get("/admin/queue-info")
 async def get_queue_info():
     """Get detailed information about the job queue."""
-    inspect = celery_app.control.inspect()
-    
-    active = inspect.active() or {}
-    reserved = inspect.reserved() or {}
-    stats = inspect.stats() or {}
+    try:
+        inspect = celery_app.control.inspect()
+        
+        active = inspect.active() or {}
+        reserved = inspect.reserved() or {}
+        stats = inspect.stats() or {}
 
-    return {
-        "active": {
-            "tasks": sum(len(tasks) for tasks in active.values()),
-            "by_worker": {w: len(tasks) for w, tasks in active.items()},
-        },
-        "reserved": {
-            "tasks": sum(len(tasks) for tasks in reserved.values()),
-            "by_worker": {w: len(tasks) for w, tasks in reserved.items()},
-        },
-        "workers": list(stats.keys()),
-        "pool_size": len(stats),
-    }
-
+        return {
+            "active": {
+                "tasks": sum(len(tasks) for tasks in active.values()),
+                "by_worker": {w: len(tasks) for w, tasks in active.items()},
             },
-            "captures": {
-                "total": total_captures,
-                "pending": pending_captures,
-                "completed": completed_captures,
-                "failed": failed_captures,
-                "analyzing": db.query(Capture).filter_by(status="analyzing").count(),
+            "reserved": {
+                "tasks": sum(len(tasks) for tasks in reserved.values()),
+                "by_worker": {w: len(tasks) for w, tasks in reserved.items()},
             },
+            "workers": list(stats.keys()),
+            "pool_size": len(stats),
         }
     except Exception as e:
         logger.error(f"Error getting stats: {str(e)}")

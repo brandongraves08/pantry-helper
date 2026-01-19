@@ -121,11 +121,13 @@ class InventoryManager:
         ).first()
 
         if not state:
-            state = InventoryState(item_id=inv_item.id)
+            state = InventoryState(item_id=inv_item.id, count_estimate=0)
             self.db.add(state)
+            self.db.flush()
 
-        delta = new_count - state.count_estimate
+        delta = new_count - (state.count_estimate or 0)
         state.count_estimate = new_count
+        state.confidence = 1.0  # Manual entries have full confidence
         state.is_manual = True
         state.notes = notes
         state.last_seen_at = datetime.utcnow()

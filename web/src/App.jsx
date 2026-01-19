@@ -74,6 +74,27 @@ function App() {
     }
   }
 
+  const handleDeleteItem = async (itemName) => {
+    if (!window.confirm(`Are you sure you want to delete "${itemName}"?`)) {
+      return
+    }
+    try {
+      await handleOverride(itemName, 0, 'deleted')
+      setInventory(inventory.filter(item => item.canonical_name !== itemName))
+    } catch (err) {
+      setError('Failed to delete item: ' + err.message)
+    }
+  }
+
+  const handleUpdateItemCount = async (itemName, newCount) => {
+    try {
+      await handleOverride(itemName, newCount, `count updated to ${newCount}`)
+      await fetchInventory()
+    } catch (err) {
+      setError('Failed to update item: ' + err.message)
+    }
+  }
+
   const handleImageUpload = async (file) => {
     try {
       setUploading(true)
@@ -186,10 +207,10 @@ function App() {
               ) : inventory.length === 0 ? (
                 <div className="py-8 text-center">
                   <p className="text-gray-500">No items in inventory yet.</p>
-                  <p className="text-sm text-gray-400">Upload an image or manually add items.</p>
+                  <p className="text-sm text-gray-400">Upload an image or manually add items to get started.</p>
                 </div>
               ) : (
-                <InventoryList items={inventory} />
+                <InventoryList items={inventory} onDelete={handleDeleteItem} onUpdate={handleUpdateItemCount} />
               )}
             </div>
           </div>
@@ -197,8 +218,8 @@ function App() {
           {/* Right Column */}
           <div className="space-y-6">
             <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-              <h3 className="mb-4 text-lg font-semibold text-gray-900">✏️ Manual Override</h3>
-              <ManualOverride onSubmit={handleOverride} />
+              <h3 className="mb-4 text-lg font-semibold text-gray-900">✏️ Add / Update Item</h3>
+              <ManualOverride onSubmit={handleOverride} existingItems={inventory} />
             </div>
             <TaskMonitor />
           </div>

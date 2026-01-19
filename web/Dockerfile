@@ -12,11 +12,8 @@ RUN npm ci
 # Copy application code
 COPY . .
 
-# Build for production
-RUN npm run build
-
 # Expose port
 EXPOSE 3000
 
-# Start development server
+# Start development server (accessible from host)
 CMD ["npm", "run", "dev", "--", "--host"]

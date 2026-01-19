@@ -3,6 +3,14 @@
 help:
 	@echo "Pantry Inventory - Available targets:"
 	@echo ""
+	@echo "🐳 Docker (Recommended):"
+	@echo "  make docker-up           Start all services with Docker"
+	@echo "  make docker-down         Stop all services"
+	@echo "  make docker-logs         View service logs"
+	@echo "  make docker-seed         Create test devices"
+	@echo "  make docker-test         Run tests in Docker"
+	@echo "  make docker-clean        Full cleanup (removes data)"
+	@echo ""
 	@echo "Backend:"
 	@echo "  make backend-install     Install backend dependencies"
 	@echo "  make backend-run         Run backend API server"
@@ -65,6 +73,31 @@ web-build:
 web-preview:
 	cd web && npm run preview
 
+# Docker targets
+docker-up:
+	docker-compose up -d
+
+docker-down:
+	docker-compose down
+
+docker-build:
+	docker-compose build
+
+docker-logs:
+	docker-compose logs -f
+
+docker-ps:
+	docker-compose ps
+
+docker-clean:
+	docker-compose down -v
+
+docker-seed:
+	docker-compose exec backend python scripts/seed_db.py seed
+
+docker-test:
+	docker-compose exec backend pytest tests/ -v
+
 # Cleanup
 clean:
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
@@ -94,3 +127,9 @@ all: backend-install web-install
 	@echo "2. Run 'make backend-seed' to create test devices"
 	@echo "3. Run 'make backend-run' to start the API server"
 	@echo "4. Run 'make web-dev' to start the web UI"
+	@echo ""
+	@echo "Or use Docker:"
+	@echo "1. Copy .env.docker.example to .env"
+	@echo "2. Configure your vision API key in .env"
+	@echo "3. Run 'make docker-up' to start all services"
+	@echo "4. Run 'make docker-seed' to create test devices"

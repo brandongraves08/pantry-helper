@@ -106,6 +106,16 @@ async def ingest_image(
 
         db.commit()
 
+        # Queue image processing task (async)
+        try:
+            from app.workers.celery_app import process_image_capture
+            process_image_capture.delay(capture.id)
+        except Exception as task_err:
+            # Log error but don't fail the request
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to queue processing task: {task_err}")
+
         return CaptureResponse(
             capture_id=capture.id,
             status="stored",
