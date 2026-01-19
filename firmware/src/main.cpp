@@ -14,6 +14,9 @@ volatile bool image_captured = false;
 volatile uint8_t* captured_image = nullptr;
 volatile size_t captured_image_size = 0;
 
+// Forward declarations
+void handle_capture_event(const char* trigger_type);
+
 void setup() {
     Serial.begin(115200);
     delay(1000);
@@ -25,6 +28,7 @@ void setup() {
     
     // Initialize configuration
     Serial.println("[SETUP] Loading configuration...");
+    Config::_init_defaults();
     Config::load();
     Serial.printf("[SETUP] Device ID: %s\n", Config::device_id);
     
@@ -148,5 +152,5 @@ void handle_capture_event(const char* trigger_type) {
     Serial.println("[SLEEP]   - Timer interrupt (periodic fallback)\n");
     
     delay(500);  // Give time for serial to flush
-    Power::deep_sleep(Config::quiet_period_ms);
+    Power::deep_sleep(Config::settings.quiet_period_ms);
 }

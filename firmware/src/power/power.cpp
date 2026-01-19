@@ -1,5 +1,7 @@
 #include "power.h"
 #include <esp_sleep.h>
+#include <driver/gpio.h>
+#include <rom/gpio.h>
 
 // Define wakeup pins
 #define DOOR_WAKEUP_PIN 33    // GPIO33 - door sensor
@@ -8,28 +10,25 @@
 void Power::init() {
     Serial.println("[POWER] Initializing power management...");
     
-    // Configure RTC data persistence for wake reason
-    rtc_gpio_init(GPIO_NUM_33);
-    rtc_gpio_set_direction(GPIO_NUM_33, RTC_GPIO_MODE_INPUT_ONLY);
+    // Configure GPIO33 for external wakeup
+    gpio_config_t io_conf = {};
+    io_conf.intr_type = GPIO_INTR_DISABLE;
+    io_conf.mode = GPIO_MODE_INPUT;
+    io_conf.pin_bit_mask = (1ULL << 33);
+    io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
+    io_conf.pull_up_en = GPIO_PULLUP_ENABLE;
+    gpio_config(&io_conf);
     
-    // Enable ext0 wakeup on door sensor (GPIO33, LOW level)
+    // Enable ext0 wakeup on GPIO33 (LOW level)
     esp_sleep_enable_ext0_wakeup(GPIO_NUM_33, 0);
-    
-    // Enable timer wakeup (as fallback/periodic check)
-    // This is configured per-sleep in deep_sleep()
     
     Serial.println("[POWER] Initialized");
 }
 
 void Power::deep_sleep(uint32_t duration_ms) {
     Serial.printf("[POWER] Going to sleep for %lu ms\n", duration_ms);
-    Serial.printf("[POWER] Wake reason will be: timer interrupt\n");
     
     delay(100);  // Flush serial
-    
-    // Disable WiFi and Bluetooth to save power
-    esp_wifi_stop();
-    esp_bt_controller_disable();
     
     // Configure timer wakeup
     esp_sleep_enable_timer_wakeup(duration_ms * 1000ULL);  // Convert to microseconds

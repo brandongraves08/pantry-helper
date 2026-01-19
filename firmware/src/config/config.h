@@ -25,4 +25,5 @@ namespace Config {
     void load();
     void save();
     void reset_to_defaults();
+    void _init_defaults();
 }

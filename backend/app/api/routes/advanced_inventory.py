@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.db.database import get_db
 from app.db.models import InventoryItem, InventoryState, InventoryEvent, Capture
 from app.models.schemas import (
-    InventoryItemSchema,
+    InventoryItem as InventoryItemSchema,
     InventoryResponse,
 )
 

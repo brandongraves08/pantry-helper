@@ -144,7 +144,7 @@ bool Upload::send_image(
         stream->write((uint8_t*)closing.c_str(), closing.length());
         
         // Send POST request
-        int httpCode = http.POST(0);  // 0 bytes since we already wrote the body
+        int httpCode = http.POST("");  // Empty string since we already wrote the body
         
         Serial.printf("[UPLOAD] HTTP response code: %d\n", httpCode);
         
