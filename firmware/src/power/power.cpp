@@ -1,29 +1,95 @@
 #include "power.h"
+#include <esp_sleep.h>
+
+// Define wakeup pins
+#define DOOR_WAKEUP_PIN 33    // GPIO33 - door sensor
+#define BATTERY_ADC_PIN 34    // GPIO34 - ADC for battery voltage
 
 void Power::init() {
-    // Configure RTC memory, wakeup sources, etc.
+    Serial.println("[POWER] Initializing power management...");
+    
+    // Configure RTC data persistence for wake reason
+    rtc_gpio_init(GPIO_NUM_33);
+    rtc_gpio_set_direction(GPIO_NUM_33, RTC_GPIO_MODE_INPUT_ONLY);
+    
+    // Enable ext0 wakeup on door sensor (GPIO33, LOW level)
+    esp_sleep_enable_ext0_wakeup(GPIO_NUM_33, 0);
+    
+    // Enable timer wakeup (as fallback/periodic check)
+    // This is configured per-sleep in deep_sleep()
+    
     Serial.println("[POWER] Initialized");
 }
 
 void Power::deep_sleep(uint32_t duration_ms) {
     Serial.printf("[POWER] Going to sleep for %lu ms\n", duration_ms);
+    Serial.printf("[POWER] Wake reason will be: timer interrupt\n");
+    
     delay(100);  // Flush serial
-    esp_sleep_enable_timer_wakeup(duration_ms * 1000);  // Convert to microseconds
+    
+    // Disable WiFi and Bluetooth to save power
+    esp_wifi_stop();
+    esp_bt_controller_disable();
+    
+    // Configure timer wakeup
+    esp_sleep_enable_timer_wakeup(duration_ms * 1000ULL);  // Convert to microseconds
+    
+    // Start deep sleep
     esp_deep_sleep_start();
+    
+    // Never reached
 }
 
 uint32_t Power::get_wake_reason() {
     esp_sleep_wakeup_cause_t cause = esp_sleep_get_wakeup_cause();
-    return (uint32_t)cause;
+    
+    Serial.print("[POWER] Wake reason: ");
+    switch(cause) {
+        case ESP_SLEEP_WAKEUP_EXT0:
+            Serial.println("External signal (EXT0 - GPIO)");
+            return 1;  // GPIO wakeup
+        case ESP_SLEEP_WAKEUP_TIMER:
+            Serial.println("Timer");
+            return 2;  // Timer wakeup
+        case ESP_SLEEP_WAKEUP_TOUCHPAD:
+            Serial.println("Touchpad");
+            return 3;
+        default:
+            Serial.println("Unknown or power-on");
+            return 0;
+    }
 }
 
+// Battery voltage reading
 float Battery::read_voltage() {
-    // TODO: Read ADC pin connected to voltage divider
-    return 4.2f;
+    // ADC on GPIO34 connected to voltage divider
+    // Assuming: Vbatt -> 100k -> ADC(34) -> 100k -> GND
+    // So: ADC reads Vbatt/2
+    
+    int adc_raw = analogRead(BATTERY_ADC_PIN);
+    
+    // ESP32 ADC resolution: 12-bit (0-4095) -> 0-3.3V
+    // Voltage = (adc_raw / 4095.0) * 3.3V
+    // Battery voltage = measured_voltage * 2 (due to divider)
+    
+    float measured_v = (adc_raw / 4095.0) * 3.3;
+    float battery_v = measured_v * 2.0;
+    
+    return battery_v;
 }
 
 float Battery::read_percentage() {
     float voltage = read_voltage();
-    // Approximate: 3.0V = 0%, 4.2V = 100%
-    return (voltage - 3.0f) / (4.2f - 3.0f) * 100.0f;
+    
+    // LiPo battery curve: 3.0V (0%) to 4.2V (100%)
+    // With some margin: 2.8V (dead) to 4.3V (charged)
+    
+    const float MIN_V = 2.8;
+    const float MAX_V = 4.3;
+    
+    if (voltage < MIN_V) return 0.0;
+    if (voltage > MAX_V) return 100.0;
+    
+    float percentage = ((voltage - MIN_V) / (MAX_V - MIN_V)) * 100.0;
+    return percentage;
 }
