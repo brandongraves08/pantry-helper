@@ -16,7 +16,7 @@ void Config::_init_defaults() {
     strcpy(Config::settings.password, "welcomehome");
     strcpy(Config::settings.device_id, "pantry-cam-001");
     strcpy(Config::settings.api_endpoint, "http://rhel-01.thelab.lan:8000/v1/ingest");
-    strcpy(Config::settings.api_token, "iXQfmlnd6n7qO--qFqxd0AX7syxJZHdduZHs1VH-XWI");
+    strcpy(Config::settings.api_token, "QyRNM2kDF8anvaemTJlddemFD5OMcWgErYFImZ7Jx38");
     Config::settings.light_threshold = 100;
     Config::settings.quiet_period_ms = 30000;
 }

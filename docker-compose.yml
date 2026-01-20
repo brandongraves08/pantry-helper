@@ -1,10 +1,9 @@
-version: '3.8'
-
 services:
   # PostgreSQL Database
   db:
     image: postgres:15-alpine
     container_name: pantry-db
+    restart: always
     environment:
       POSTGRES_USER: ${DB_USER:-pantry}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-pantry_secure_pass}
@@ -25,6 +24,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: pantry-redis
+    restart: always
     ports:
       - "6379:6379"
     volumes:
@@ -43,6 +43,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: pantry-api
+    restart: always
     environment:
       DATABASE_URL: postgresql://${DB_USER:-pantry}:${DB_PASSWORD:-pantry_secure_pass}@db:5432/${DB_NAME:-pantry_db}
       REDIS_URL: redis://redis:6379/0
@@ -80,6 +81,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: pantry-worker
+    restart: always
     environment:
       DATABASE_URL: postgresql://${DB_USER:-pantry}:${DB_PASSWORD:-pantry_secure_pass}@db:5432/${DB_NAME:-pantry_db}
       REDIS_URL: redis://redis:6379/0
@@ -107,6 +109,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: pantry-flower
+    restart: always
     environment:
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0

@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     # API Configuration
     API_TITLE: str = "Pantry Inventory API"
     API_VERSION: str = "1.0.0"
-    DEBUG: bool = os.getenv("DEBUG", "False").lower() == "true"
+    DEBUG: bool = os.getenv("DEBUG", "false").lower() == "true"
 
     # Database Configuration
     DATABASE_URL: str = os.getenv(
@@ -52,7 +52,7 @@ class Settings(BaseSettings):
     MAX_STORAGE_MB: int = int(os.getenv("MAX_STORAGE_MB", "5000"))
 
     # Logging Configuration
-    LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
+    LOG_LEVEL: str = os.getenv("LOG_LEVEL", "WARNING")
 
     class Config:
         env_file = ".env"
