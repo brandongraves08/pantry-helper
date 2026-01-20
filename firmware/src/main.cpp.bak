@@ -1,0 +1,191 @@
+#include <Arduino.h>
+#include <time.h>
+#include "config/config.h"
+#include "power/power.h"
+#include "sensors/sensors.h"
+#include "camera/camera.h"
+#include "net/wifi_manager.h"
+#include "upload/upload.h"
+
+// Use Serial2 on UART2 (GPIO16 RX, GPIO17 TX) to avoid conflict with camera
+// Serial is on UART0 (GPIO1/3) which conflicts with camera module
+
+void setup() {
+    Serial.begin(115200);   // UART0 for USB debugging
+    Serial2.begin(115200);  // UART2 for debugging
+    delay(1000);
+    
+    Serial.println("\n\n╔════════════════════════════════════════╗");
+    Serial.println("║     PANTRY CAMERA SYSTEM STARTING      ║");
+    Serial.println("║         Phase 4: Full Firmware         ║");
+    Serial.println("╚════════════════════════════════════════╝\n");
+    Serial2.println("\n\n╔════════════════════════════════════════╗");
+    Serial2.println("║     PANTRY CAMERA SYSTEM STARTING      ║");
+    Serial2.println("║         Phase 4: Full Firmware         ║");
+    Serial2.println("╚════════════════════════════════════════╝\n");
+    
+    // Initialize configuration
+    Serial.println("[SETUP] Loading configuration...");
+    Serial2.println("[SETUP] Loading configuration...");
+    Serial.flush();
+    Serial2.flush();
+    Config::_init_defaults();
+    Config::load();
+    Serial.printf("[SETUP] Device ID: %s\n", Config::device_id);
+    Serial2.printf("[SETUP] Device ID: %s\n", Config::device_id);
+    Serial.flush();
+    Serial2.flush();
+    
+    // Initialize subsystems
+    Serial.println("[SETUP] Initializing power management...");
+    Serial2.println("[SETUP] Initializing power management...");
+    Serial.flush();
+    Serial2.flush();
+    Power::init();
+    Serial.println("[SETUP] Power init complete");
+    Serial2.println("[SETUP] Power init complete");
+    Serial.flush();
+    Serial2.flush();
+    
+    Serial.println("[SETUP] Initializing sensors...");
+    Serial2.println("[SETUP] Initializing sensors...");
+    Serial.flush();
+    Serial2.flush();
+    Sensors::init();
+    Serial.println("[SETUP] Sensors init complete");
+    Serial2.println("[SETUP] Sensors init complete");
+    Serial.flush();
+    Serial2.flush();
+    
+    Serial.println("[SETUP] Initializing camera...");
+    Serial2.println("[SETUP] Initializing camera...");
+    // Camera::init();  // Temporarily disabled - library not available
+    Serial.println("[SETUP] ⚠ Camera init skipped (library pending)");
+    Serial2.println("[SETUP] ⚠ Camera init skipped (library pending)");
+    Serial.flush();
+    Serial2.flush();
+    
+    // Print wake reason
+    uint32_t wake_reason = Power::get_wake_reason();
+    Serial.printf("[SETUP] Wake reason: %lu\n", wake_reason);
+    Serial2.printf("[SETUP] Wake reason: %lu\n", wake_reason);
+    Serial.flush();
+    Serial2.flush();
+    
+    // Print battery status
+    float battery_v = Battery::read_voltage();
+    float battery_pct = Battery::read_percentage();
+    Serial.printf("[SETUP] Battery: %.2fV (%.1f%%)\n", battery_v, battery_pct);
+    Serial2.printf("[SETUP] Battery: %.2fV (%.1f%%)\n", battery_v, battery_pct);
+    Serial.flush();
+    Serial2.flush();
+
+    Serial.println("[SETUP] ✓ All systems initialized\n");
+    Serial.println("═══════════════════════════════════════\n");
+    Serial2.println("[SETUP] ✓ All systems initialized\n");
+    Serial2.println("═══════════════════════════════════════\n");
+    Serial.flush();
+    Serial2.flush();
+}
+
+static bool first_boot = true;
+static unsigned long last_capture_time = 0;
+const unsigned long CAPTURE_INTERVAL_MS = 60000;  // 1 minute
+
+void handle_capture_event(const char* trigger_type) {
+    // Handle a capture trigger event
+    Serial.printf("\n[CAPTURE] Triggered by: %s\n", trigger_type);
+    Serial2.printf("\n[CAPTURE] Triggered by: %s\n", trigger_type);
+    Serial.flush();
+    Serial2.flush();
+    
+    Serial.println("[CAPTURE] → Connecting WiFi...");
+    Serial2.println("[CAPTURE] → Connecting WiFi...");
+    Serial.flush();
+    Serial2.flush();
+    
+    // Connect to WiFi
+    if (!WiFiManager::connect(Config::ssid, Config::password, 15000)) {
+        Serial.println("[CAPTURE] ✗ WiFi connection failed");
+        Serial2.println("[CAPTURE] ✗ WiFi connection failed");
+        Serial.flush();
+        Serial2.flush();
+        return;
+    }
+    
+    Serial.printf("[CAPTURE] → WiFi connected!\n");
+    Serial.printf("[CAPTURE] → RSSI: %d dBm\n", WiFiManager::get_rssi());
+    Serial2.printf("[CAPTURE] → WiFi connected!\n");
+    Serial2.printf("[CAPTURE] → RSSI: %d dBm\n", WiFiManager::get_rssi());
+    Serial.flush();
+    Serial2.flush();
+    
+    // For now, create a dummy image or skip actual camera capture
+    // TODO: Integrate actual camera capture
+    uint8_t dummy_image[] = {0xFF, 0xD8, 0xFF, 0xE0};  // JPEG header
+    size_t image_size = sizeof(dummy_image);
+    
+    float battery_v = Battery::read_voltage();
+    int rssi = WiFiManager::get_rssi();
+    
+    Serial.println("[CAPTURE] → Uploading image to backend...");
+    Serial2.println("[CAPTURE] → Uploading image to backend...");
+    Serial.flush();
+    Serial2.flush();
+    
+    if (Upload::send_image(dummy_image, image_size, Config::device_id, time(nullptr), trigger_type, battery_v, rssi)) {
+        Serial.println("[CAPTURE] ✓ Upload successful!");
+        Serial2.println("[CAPTURE] ✓ Upload successful!");
+    } else {
+        Serial.println("[CAPTURE] ✗ Upload failed!");
+        Serial2.println("[CAPTURE] ✗ Upload failed!");
+    }
+    
+    Serial.flush();
+    Serial2.flush();
+    
+    Serial.println("[CAPTURE] → Disconnecting WiFi");
+    Serial2.println("[CAPTURE] → Disconnecting WiFi");
+    WiFiManager::disconnect();
+    Serial.println("[CAPTURE] → Ready for next capture");
+    Serial2.println("[CAPTURE] → Ready for next capture");
+    Serial.flush();
+    Serial2.flush();
+}
+
+void loop() {
+    unsigned long now = millis();
+    
+    // Capture on first boot
+    if (first_boot) {
+        delay(2000);
+        Serial.println("\n[MAIN] ═══════════════════════════════════════");
+        Serial.println("[MAIN] Boot capture triggered!");
+        Serial.println("[MAIN] ═══════════════════════════════════════");
+        Serial2.println("\n[MAIN] ═══════════════════════════════════════");
+        Serial2.println("[MAIN] Boot capture triggered!");
+        Serial2.println("[MAIN] ═══════════════════════════════════════");
+        Serial.flush();
+        Serial2.flush();
+        first_boot = false;
+        last_capture_time = now;
+        handle_capture_event("boot");
+    }
+    
+    // Capture every minute
+    if (now - last_capture_time > CAPTURE_INTERVAL_MS) {
+        last_capture_time = now;
+        Serial.println("\n[MAIN] ═══════════════════════════════════════");
+        Serial.println("[MAIN] Periodic capture triggered (1 minute interval)!");
+        Serial.println("[MAIN] ═══════════════════════════════════════");
+        Serial2.println("\n[MAIN] ═══════════════════════════════════════");
+        Serial2.println("[MAIN] Periodic capture triggered (1 minute interval)!");
+        Serial2.println("[MAIN] ═══════════════════════════════════════");
+        Serial.flush();
+        Serial2.flush();
+        handle_capture_event("timer");
+    }
+    
+    // Keep loop responsive
+    delay(100);
+}

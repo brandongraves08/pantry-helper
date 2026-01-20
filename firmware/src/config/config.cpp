@@ -12,11 +12,11 @@ char* Config::api_token = Config::settings.api_token;
 
 void Config::_init_defaults() {
     // Initialize settings with defaults
-    strcpy(Config::settings.ssid, "YOUR_SSID");
-    strcpy(Config::settings.password, "YOUR_PASSWORD");
+    strcpy(Config::settings.ssid, "Mine!");
+    strcpy(Config::settings.password, "welcomehome");
     strcpy(Config::settings.device_id, "pantry-cam-001");
-    strcpy(Config::settings.api_endpoint, "https://api.example.com/v1/ingest");
-    strcpy(Config::settings.api_token, "your-device-token-here");
+    strcpy(Config::settings.api_endpoint, "http://rhel-01.thelab.lan:8000/v1/ingest");
+    strcpy(Config::settings.api_token, "iXQfmlnd6n7qO--qFqxd0AX7syxJZHdduZHs1VH-XWI");
     Config::settings.light_threshold = 100;
     Config::settings.quiet_period_ms = 30000;
 }
