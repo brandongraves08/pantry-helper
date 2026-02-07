@@ -45,6 +45,17 @@ class Observation(Base):
 
     capture = relationship("Capture", back_populates="observations")
 
+class Location(Base):
+    __tablename__ = "locations"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String, nullable=False)
+    parent_id = Column(String, ForeignKey("locations.id"), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    parent = relationship("Location", remote_side=[id], backref="children")
+
+
 class InventoryItem(Base):
     __tablename__ = "inventory_items"
 
@@ -52,6 +63,8 @@ class InventoryItem(Base):
     canonical_name = Column(String, nullable=False, unique=True)
     brand = Column(String, nullable=True)
     package_type = Column(String, nullable=True)
+    category = Column(String, nullable=True)
+    unit = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     states = relationship("InventoryState", back_populates="item")
@@ -62,14 +75,23 @@ class InventoryState(Base):
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     item_id = Column(String, ForeignKey("inventory_items.id"), nullable=False)
+    location_id = Column(String, ForeignKey("locations.id"), nullable=True)
+
     count_estimate = Column(Integer, nullable=False, default=0)
     confidence = Column(Float, nullable=False, default=0.0)
     last_seen_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Home inventory fields
+    expires_at = Column(DateTime(timezone=True), nullable=True)
+    opened_at = Column(DateTime(timezone=True), nullable=True)
+    par_level = Column(Integer, nullable=True)
+
     is_manual = Column(Boolean, nullable=False, default=False)
     notes = Column(String, nullable=True)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     item = relationship("InventoryItem", back_populates="states")
+    location = relationship("Location")
 
 class InventoryEvent(Base):
     __tablename__ = "inventory_events"
@@ -83,3 +105,31 @@ class InventoryEvent(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     item = relationship("InventoryItem", back_populates="events")
+
+
+class ShoppingListItem(Base):
+    __tablename__ = "shopping_list_items"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    item_id = Column(String, ForeignKey("inventory_items.id"), nullable=False)
+    location_id = Column(String, ForeignKey("locations.id"), nullable=True)
+    needed = Column(Integer, nullable=False, default=0)
+    reason = Column(String, nullable=True)
+    resolved_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    item = relationship("InventoryItem")
+    location = relationship("Location")
+
+
+class InventoryReview(Base):
+    __tablename__ = "inventory_reviews"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    capture_id = Column(String, ForeignKey("captures.id"), nullable=False)
+    status = Column(String, nullable=False, default="pending")  # pending/approved/rejected
+    notes = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    resolved_at = Column(DateTime(timezone=True), nullable=True)
+
+    capture = relationship("Capture")

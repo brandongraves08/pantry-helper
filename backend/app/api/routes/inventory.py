@@ -3,8 +3,16 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.db.database import get_db
-from app.db.models import InventoryState, InventoryItem
-from app.models.schemas import InventoryResponse, InventoryItem as InventoryItemSchema, InventoryOverride
+from app.db.models import InventoryState, InventoryItem, Location, ShoppingListItem as ShoppingListItemModel, InventoryReview
+from app.models.schemas import (
+    InventoryResponse,
+    InventoryItem as InventoryItemSchema,
+    InventoryOverride,
+    ShoppingListResponse,
+    ShoppingListItem,
+    ReviewRequest,
+    ReviewResponse,
+)
 from app.services.inventory import InventoryManager
 
 router = APIRouter()
@@ -20,9 +28,15 @@ async def get_inventory(db: Session = Depends(get_db)):
             canonical_name=state.item.canonical_name,
             brand=state.item.brand,
             package_type=state.item.package_type,
+            category=getattr(state.item, "category", None),
+            unit=getattr(state.item, "unit", None),
             count_estimate=state.count_estimate,
             confidence=state.confidence,
             last_seen_at=state.last_seen_at or datetime.utcnow(),
+            location=(state.location.name if getattr(state, "location", None) else None),
+            expires_at=getattr(state, "expires_at", None),
+            opened_at=getattr(state, "opened_at", None),
+            par_level=getattr(state, "par_level", None),
             is_manual=state.is_manual,
             notes=state.notes,
         )
@@ -40,8 +54,8 @@ async def override_inventory(
     override: InventoryOverride,
     db: Session = Depends(get_db),
 ):
-    """Manually correct an inventory item count"""
-    
+    """Manually correct an inventory item count (and optionally set home fields)."""
+
     manager = InventoryManager(db)
     try:
         item = manager.manual_override(
@@ -49,12 +63,42 @@ async def override_inventory(
             new_count=override.count_estimate,
             notes=override.notes,
         )
+
+        # Apply extra metadata/location/expiry if provided
+        if override.location:
+            loc = (
+                db.query(Location)
+                .filter(Location.name == override.location, Location.parent_id.is_(None))
+                .first()
+            )
+            if not loc:
+                loc = Location(name=override.location)
+                db.add(loc)
+                db.flush()
+
+            # attach location + fields to the item's state row
+            state = db.query(InventoryState).filter(InventoryState.item_id == item.id).first()
+            if state:
+                state.location_id = loc.id
+
+        state = db.query(InventoryState).filter(InventoryState.item_id == item.id).first()
+        if state:
+            if override.expires_at is not None:
+                state.expires_at = override.expires_at
+            if override.opened_at is not None:
+                state.opened_at = override.opened_at
+            if override.par_level is not None:
+                state.par_level = override.par_level
+
+        db.commit()
+
         return {
             "success": True,
             "item_id": item.id,
             "message": f"Updated {override.item_name} to {override.count_estimate}",
         }
     except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/inventory/history")

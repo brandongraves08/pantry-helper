@@ -22,9 +22,19 @@ class InventoryItem(BaseModel):
     canonical_name: str
     brand: Optional[str] = None
     package_type: Optional[str] = None
+    category: Optional[str] = None
+    unit: Optional[str] = None
+
     count_estimate: int
     confidence: float
     last_seen_at: datetime
+
+    # Home inventory fields
+    location: Optional[str] = None
+    expires_at: Optional[datetime] = None
+    opened_at: Optional[datetime] = None
+    par_level: Optional[int] = None
+
     is_manual: bool = False
     notes: Optional[str] = None
 
@@ -52,6 +62,36 @@ class InventoryOverride(BaseModel):
     item_name: str
     count_estimate: int
     notes: Optional[str] = None
+    location: Optional[str] = None
+    expires_at: Optional[datetime] = None
+    opened_at: Optional[datetime] = None
+    par_level: Optional[int] = None
+
+
+class ShoppingListItem(BaseModel):
+    item_name: str
+    needed: int
+    reason: Optional[str] = None
+    location: Optional[str] = None
+
+
+class ShoppingListResponse(BaseModel):
+    items: List[ShoppingListItem]
+    updated_at: datetime
+
+
+class ReviewRequest(BaseModel):
+    capture_id: str
+    notes: Optional[str] = None
+
+
+class ReviewResponse(BaseModel):
+    id: str
+    capture_id: str
+    status: str
+    notes: Optional[str] = None
+    created_at: datetime
+    resolved_at: Optional[datetime] = None
 
 # Device Management Schemas
 
