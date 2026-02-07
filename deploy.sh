@@ -26,12 +26,18 @@ check_docker() {
 
 check_docker_compose() {
     echo -e "\n${YELLOW}Checking Docker Compose installation...${NC}"
-    if ! command -v docker-compose &> /dev/null; then
-        echo -e "${RED}Docker Compose is not installed.${NC}"
-        exit 1
+    if docker compose version &> /dev/null; then
+        DC_VERSION=$(docker compose version)
+        echo -e "${GREEN}✓ Docker Compose found: $DC_VERSION${NC}"
+        return
     fi
-    DC_VERSION=$(docker-compose --version)
-    echo -e "${GREEN}✓ Docker Compose found: $DC_VERSION${NC}"
+    if command -v docker-compose &> /dev/null; then
+        DC_VERSION=$(docker-compose --version)
+        echo -e "${GREEN}✓ Docker Compose (legacy) found: $DC_VERSION${NC}"
+        return
+    fi
+    echo -e "${RED}Docker Compose is not installed.${NC}"
+    exit 1
 }
 
 setup_env() {
@@ -47,22 +53,30 @@ setup_env() {
     echo -e "${GREEN}✓ Environment configured${NC}"
 }
 
+dc() {
+    if docker compose version &> /dev/null; then
+        docker compose "$@"
+    else
+        docker-compose "$@"
+    fi
+}
+
 build_images() {
     echo -e "\n${YELLOW}Building Docker images...${NC}"
-    docker-compose build
+    dc build
     echo -e "${GREEN}✓ Images built successfully${NC}"
 }
 
 start_services() {
     echo -e "\n${YELLOW}Starting services...${NC}"
-    docker-compose up -d
+    dc up -d
     
     echo -e "\n${YELLOW}Waiting for services to be healthy...${NC}"
     
     # Wait for backend
     echo -n "Waiting for API..."
     for i in {1..30}; do
-        if docker-compose exec backend curl -f http://localhost:8000/health &> /dev/null; then
+        if dc exec backend curl -f http://localhost:8000/health &> /dev/null; then
             echo -e "${GREEN} ✓${NC}"
             break
         fi
@@ -73,7 +87,7 @@ start_services() {
     # Wait for database
     echo -n "Waiting for database..."
     for i in {1..30}; do
-        if docker-compose exec db pg_isready -U pantry &> /dev/null; then
+        if dc exec db pg_isready -U pantry &> /dev/null; then
             echo -e "${GREEN} ✓${NC}"
             break
         fi
@@ -86,19 +100,19 @@ start_services() {
 
 run_migrations() {
     echo -e "\n${YELLOW}Running database migrations...${NC}"
-    docker-compose exec -T backend alembic upgrade head
+    dc exec -T backend alembic upgrade head
     echo -e "${GREEN}✓ Migrations completed${NC}"
 }
 
 seed_database() {
     echo -e "\n${YELLOW}Seeding database with sample data...${NC}"
-    docker-compose exec -T backend python scripts/seed_db.py
+    dc exec -T backend python scripts/seed_db.py
     echo -e "${GREEN}✓ Database seeded${NC}"
 }
 
 show_services() {
     echo -e "\n${YELLOW}Service Status:${NC}"
-    docker-compose ps
+    dc ps
 }
 
 show_urls() {
@@ -128,17 +142,17 @@ main() {
             ;;
         stop)
             echo -e "\n${YELLOW}Stopping services...${NC}"
-            docker-compose down
+            dc down
             echo -e "${GREEN}✓ Services stopped${NC}"
             ;;
         restart)
             echo -e "\n${YELLOW}Restarting services...${NC}"
-            docker-compose restart
+            dc restart
             echo -e "${GREEN}✓ Services restarted${NC}"
             show_services
             ;;
         logs)
-            docker-compose logs -f
+            dc logs -f
             ;;
         status)
             show_services
@@ -146,7 +160,7 @@ main() {
             ;;
         clean)
             echo -e "\n${YELLOW}Cleaning up containers and volumes...${NC}"
-            docker-compose down -v
+            dc down -v
             echo -e "${GREEN}✓ Cleanup complete${NC}"
             ;;
         *)

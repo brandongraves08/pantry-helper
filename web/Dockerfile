@@ -1,19 +1,23 @@
 # Frontend Dockerfile
-FROM node:18-alpine
+# Multi-target: dev (vite) and prod (nginx static)
 
+FROM node:18-alpine AS base
 WORKDIR /app
-
-# Copy package files
 COPY package*.json ./
-
-# Install dependencies
 RUN npm ci
-
-# Copy application code
 COPY . .
 
-# Expose port
-EXPOSE 3000
-
-# Start development server (accessible from host)
+FROM base AS dev
+EXPOSE 5173
 CMD ["npm", "run", "dev", "--", "--host"]
+
+FROM base AS build
+ARG VITE_API_URL=http://localhost:8000
+ENV VITE_API_URL=$VITE_API_URL
+RUN npm run build
+
+FROM nginx:1.25-alpine AS prod
+COPY --from=build /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]

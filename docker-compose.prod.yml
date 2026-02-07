@@ -1,0 +1,42 @@
+services:
+  # Production overrides
+
+  db:
+    ports: []
+
+  redis:
+    ports: []
+
+  backend:
+    volumes: []
+    command: >
+      gunicorn app.main:app
+      -k uvicorn.workers.UvicornWorker
+      -b 0.0.0.0:8000
+      --workers 2
+      --timeout 120
+      --access-logfile -
+      --error-logfile -
+    environment:
+      DEBUG: "false"
+
+  celery_worker:
+    volumes: []
+    command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=2
+
+  flower:
+    ports:
+      - "5555:5555"
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+      target: prod
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+    volumes: []
+    command: []
+    ports:
+      - "3000:80"
+    environment: {}
