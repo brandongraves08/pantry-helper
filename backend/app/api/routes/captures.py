@@ -4,10 +4,36 @@ from sqlalchemy.orm import Session
 import os
 
 from app.db.database import get_db
-from app.db.models import Capture
+from app.db.models import Capture, Observation
+from app.models.schemas import CaptureDetail
 from app.services.storage import get_storage_manager
 
 router = APIRouter()
+
+
+@router.get("/captures/{capture_id}", response_model=CaptureDetail)
+async def get_capture(capture_id: str, db: Session = Depends(get_db)):
+    cap = db.query(Capture).filter(Capture.id == capture_id).first()
+    if not cap:
+        raise HTTPException(status_code=404, detail="Capture not found")
+
+    obs = (
+        db.query(Observation)
+        .filter(Observation.capture_id == cap.id)
+        .order_by(Observation.created_at.desc())
+        .first()
+    )
+
+    return CaptureDetail(
+        id=cap.id,
+        device_id=cap.device_id,
+        trigger_type=cap.trigger_type,
+        captured_at=cap.captured_at,
+        status=cap.status,
+        error_message=cap.error_message,
+        image_path=cap.image_path,
+        latest_observation=obs.raw_json if obs else None,
+    )
 
 
 @router.get("/captures/{capture_id}/image")

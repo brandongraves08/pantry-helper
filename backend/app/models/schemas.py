@@ -17,6 +17,18 @@ class CaptureResponse(BaseModel):
     status: str
     message: Optional[str] = None
 
+
+class CaptureDetail(BaseModel):
+    id: str
+    device_id: str
+    trigger_type: str
+    captured_at: datetime
+    status: str
+    error_message: Optional[str] = None
+    image_path: str
+
+    latest_observation: Optional[dict] = None
+
 class InventoryItem(BaseModel):
     """Inventory item representation"""
     canonical_name: str

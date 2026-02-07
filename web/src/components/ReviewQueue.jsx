@@ -29,6 +29,18 @@ const ReviewQueue = () => {
     }
   }
 
+  const [details, setDetails] = useState({})
+
+  const loadCapture = async (captureId) => {
+    if (details[captureId]) return
+    try {
+      const res = await api.get(`/v1/captures/${captureId}`)
+      setDetails((d) => ({ ...d, [captureId]: res.data }))
+    } catch (e) {
+      // ignore; image preview can still work
+    }
+  }
+
   useEffect(() => {
     fetchPending()
   }, [])
@@ -58,8 +70,13 @@ const ReviewQueue = () => {
         <div className="space-y-3">
           {reviews.map((r) => {
             const imageUrl = `${API_BASE_URL}/v1/captures/${r.capture_id}/image`
+            const cap = details[r.capture_id]
             return (
-              <div key={r.id} className="rounded border border-gray-200 p-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div
+                key={r.id}
+                className="rounded border border-gray-200 p-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"
+                onMouseEnter={() => loadCapture(r.capture_id)}
+              >
                 <div className="flex gap-3">
                   <div className="h-20 w-20 rounded border border-gray-200 bg-gray-50 flex items-center justify-center overflow-hidden">
                     <img
@@ -75,7 +92,18 @@ const ReviewQueue = () => {
                   <div>
                     <div className="font-medium text-gray-900">Capture: {r.capture_id}</div>
                     <div className="text-xs text-gray-500">Created: {new Date(r.created_at).toLocaleString()}</div>
-                    {r.notes && <div className="mt-1 text-sm text-gray-700">{r.notes}</div>}
+                    {cap?.status && (
+                      <div className="mt-1 text-xs text-gray-600">
+                        Capture status: <span className="font-medium">{cap.status}</span>
+                        {cap.error_message ? ` • ${cap.error_message}` : ''}
+                      </div>
+                    )}
+                    {r.notes && <div className="mt-1 text-sm text-gray-700 whitespace-pre-line">{r.notes}</div>}
+                    {cap?.latest_observation?.items && (
+                      <div className="mt-2 text-xs text-gray-700">
+                        Detected items: {cap.latest_observation.items.length}
+                      </div>
+                    )}
                     <a
                       href={imageUrl}
                       target="_blank"
