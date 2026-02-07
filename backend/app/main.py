@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from app.api.routes import ingest, inventory, admin, devices, advanced_inventory
-from app.api.routes import shopping, reviews
+from app.api.routes import shopping, reviews, captures
 from app.db.database import engine, Base
 from app.exceptions import PantryException
 from app.middleware.rate_limit import RateLimitMiddleware
@@ -56,6 +56,7 @@ app.include_router(devices.router, prefix="/v1", tags=["devices"])
 app.include_router(admin.router, prefix="/v1", tags=["admin"])
 app.include_router(shopping.router, prefix="/v1", tags=["shopping"])
 app.include_router(reviews.router, prefix="/v1", tags=["reviews"])
+app.include_router(captures.router, prefix="/v1", tags=["captures"])
 
 @app.get("/health")
 async def health_check():
