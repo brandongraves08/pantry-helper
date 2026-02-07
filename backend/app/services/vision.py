@@ -31,21 +31,24 @@ class VisionAnalyzer:
             self._init_openai()
         elif self.provider == "gemini":
             self._init_gemini()
+        elif self.provider in ("mock", "none"):
+            self._init_mock()
         else:
             raise ValueError(f"Unsupported vision provider: {self.provider}")
     
     def _get_api_key(self) -> str:
-        """Get API key from environment based on provider"""
+        """Get API key from environment based on provider."""
         if self.provider == "openai":
             key = os.getenv("OPENAI_API_KEY")
             if not key:
                 raise ValueError("OPENAI_API_KEY is required for OpenAI provider")
             return key
-        elif self.provider == "gemini":
+        if self.provider == "gemini":
             key = os.getenv("GEMINI_API_KEY")
             if not key:
                 raise ValueError("GEMINI_API_KEY is required for Gemini provider")
             return key
+        # mock/none doesn't require keys
         return ""
     
     def _init_openai(self):
@@ -69,6 +72,12 @@ class VisionAnalyzer:
         except ImportError:
             raise ImportError("google-generativeai package not installed. Run: pip install google-generativeai")
 
+    def _init_mock(self):
+        """Initialize mock vision provider (no external API calls)."""
+        self.client = None
+        self.model = "mock"
+        logger.info("Initialized mock vision provider (no-op)")
+
     def analyze_image(self, image_path: str) -> VisionOutput:
         """
         Analyze a pantry image and extract inventory items.
@@ -87,8 +96,13 @@ class VisionAnalyzer:
         try:
             if self.provider == "openai":
                 return self._analyze_openai(image_path)
-            elif self.provider == "gemini":
+            if self.provider == "gemini":
                 return self._analyze_gemini(image_path)
+            if self.provider in ("mock", "none"):
+                # Validate file exists, then return an empty observation.
+                with open(image_path, "rb"):
+                    pass
+                return VisionOutput(scene_confidence=0.0, items=[], notes="mock provider: no analysis performed")
         except FileNotFoundError:
             logger.error(f"Image file not found: {image_path}")
             raise VisionAnalysisError(f"Image file not found: {image_path}")

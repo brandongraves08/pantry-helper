@@ -49,6 +49,8 @@ services:
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
+      # Storage (shared with worker)
+      STORAGE_PATH: /data/storage
       VISION_PROVIDER: ${VISION_PROVIDER:-openai}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4-vision-preview}
@@ -65,6 +67,7 @@ services:
         condition: service_healthy
     volumes:
       - ./backend:/app
+      - ./data/storage:/data/storage
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     networks:
       - pantry-network
@@ -87,6 +90,7 @@ services:
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
+      STORAGE_PATH: /data/storage
       VISION_PROVIDER: ${VISION_PROVIDER:-openai}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4-vision-preview}
@@ -99,6 +103,7 @@ services:
       - backend
     volumes:
       - ./backend:/app
+      - ./data/storage:/data/storage
     command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=4
     networks:
       - pantry-network

@@ -17,10 +17,19 @@ class CaptureProcessor:
     """Process captures: analyze images and update inventory"""
     
     def __init__(self):
-        api_key = os.getenv("OPENAI_API_KEY")
+        provider = os.getenv("VISION_PROVIDER", "openai").lower()
+
+        # In production-test mode we allow a mock provider that doesn't require API keys.
+        if provider in ("mock", "none"):
+            self.analyzer = VisionAnalyzer(api_key=None, provider="mock")
+            return
+
+        api_key = os.getenv("OPENAI_API_KEY") if provider == "openai" else os.getenv("GEMINI_API_KEY")
         if not api_key:
-            logger.warning("OPENAI_API_KEY not set - vision analysis will fail")
-        self.analyzer = VisionAnalyzer(api_key) if api_key else None
+            logger.warning(f"{provider.upper()} API key not set - vision analysis will fail")
+            self.analyzer = None
+        else:
+            self.analyzer = VisionAnalyzer(api_key=api_key, provider=provider)
     
     def process_capture(self, capture_id: str) -> bool:
         """
@@ -55,7 +64,15 @@ class CaptureProcessor:
             if not self.analyzer:
                 raise VisionAnalysisError("Vision analyzer not initialized")
             
-            vision_output = self.analyzer.analyze_image(capture.image_path)
+            # Resolve relative image paths against STORAGE_PATH
+            image_path = capture.image_path
+            if image_path and not os.path.isabs(image_path):
+                from app.services.storage import get_storage_manager
+
+                storage_mgr = get_storage_manager()
+                image_path = str(storage_mgr.storage_path / image_path)
+
+            vision_output = self.analyzer.analyze_image(image_path)
             
             # Store raw observation
             observation = Observation(

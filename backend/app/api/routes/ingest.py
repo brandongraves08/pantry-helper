@@ -16,9 +16,7 @@ from app.exceptions import (
 
 router = APIRouter()
 
-# Configure storage path
-IMAGES_DIR = os.getenv("IMAGES_DIR", "./storage/images")
-os.makedirs(IMAGES_DIR, exist_ok=True)
+from app.services.storage import get_storage_manager
 
 @router.post("/ingest", response_model=CaptureResponse)
 async def ingest_image(
@@ -77,32 +75,30 @@ async def ingest_image(
         if not (-120 <= rssi <= 0):
             raise ValidationError("RSSI out of range (-120 to 0 dBm)", field="rssi")
 
-        # Save image
-        try:
-            image_filename = f"{uuid.uuid4()}.jpg"
-            image_path = os.path.join(IMAGES_DIR, image_filename)
-            
-            content = await image.read()
-            if len(content) == 0:
-                raise ValidationError("Image file is empty", field="image")
-            
-            with open(image_path, "wb") as f:
-                f.write(content)
-        except IOError as e:
-            raise StorageError(f"Failed to save image: {str(e)}")
-
-        # Create capture record
+        # Create capture record first to get capture_id for deterministic filename
         capture = Capture(
             device_id=device_id,
             trigger_type=trigger_type,
             captured_at=captured_at,
-            image_path=image_path,
+            image_path="pending",
             battery_v=battery_v,
             rssi=rssi,
             status="stored",
         )
         db.add(capture)
-        db.flush()
+        db.flush()  # assigns capture.id
+
+        # Save image (to STORAGE_PATH/images/) and store relative path in DB
+        try:
+            content = await image.read()
+            if len(content) == 0:
+                raise ValidationError("Image file is empty", field="image")
+
+            storage_mgr = get_storage_manager()
+            relative_path = storage_mgr.save_image(device_id=device_id, capture_id=capture.id, image_data=content)
+            capture.image_path = relative_path
+        except IOError as e:
+            raise StorageError(f"Failed to save image: {str(e)}")
 
         # Update device last seen
         device.last_seen_at = datetime.utcnow()

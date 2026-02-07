@@ -3,12 +3,17 @@ services:
 
   db:
     ports: []
+    mem_limit: 2048m
+    cpus: 2.0
 
   redis:
     ports: []
+    mem_limit: 256m
+    cpus: 0.5
 
   backend:
-    volumes: []
+    volumes:
+      - ./data/storage:/data/storage
     command: >
       gunicorn app.main:app
       -k uvicorn.workers.UvicornWorker
@@ -19,10 +24,22 @@ services:
       --error-logfile -
     environment:
       DEBUG: "false"
+      STORAGE_PATH: /data/storage
+      # If no provider is set in .env, default to mock so "production ready to test" doesn't
+      # hard-require external API keys.
+      VISION_PROVIDER: ${VISION_PROVIDER:-mock}
+    mem_limit: 1024m
+    cpus: 1.0
 
   celery_worker:
-    volumes: []
+    volumes:
+      - ./data/storage:/data/storage
+    environment:
+      STORAGE_PATH: /data/storage
+      VISION_PROVIDER: ${VISION_PROVIDER:-mock}
     command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=2
+    mem_limit: 1024m
+    cpus: 1.0
 
   flower:
     ports:
@@ -40,3 +57,5 @@ services:
     ports:
       - "3000:80"
     environment: {}
+    mem_limit: 256m
+    cpus: 0.5
