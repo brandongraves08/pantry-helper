@@ -55,6 +55,11 @@ async def list_pending_reviews(db: Session = Depends(get_db)):
 
 @router.post("/reviews/{review_id}/{action}", response_model=ReviewResponse)
 async def resolve_review(review_id: str, action: str, db: Session = Depends(get_db)):
+    """Resolve a manual check.
+
+    - approve: queues processing for the capture (best-effort) and marks review approved.
+    - reject: marks review rejected.
+    """
     if action not in ("approve", "reject"):
         raise HTTPException(status_code=400, detail="Action must be approve|reject")
 
@@ -62,7 +67,25 @@ async def resolve_review(review_id: str, action: str, db: Session = Depends(get_
     if not review:
         raise HTTPException(status_code=404, detail="Review not found")
 
-    review.status = "approved" if action == "approve" else "rejected"
+    if action == "approve":
+        # Best-effort: queue the capture for processing so "approve" actually does something.
+        # If Celery/broker is down, we still mark approved.
+        task_id = None
+        try:
+            from app.workers.celery_app import process_image_capture
+
+            task = process_image_capture.delay(review.capture_id)
+            task_id = getattr(task, "id", None)
+        except Exception:
+            task_id = None
+
+        if task_id:
+            review.notes = (review.notes or "") + ("\n" if review.notes else "") + f"queued task: {task_id}"
+
+        review.status = "approved"
+    else:
+        review.status = "rejected"
+
     review.resolved_at = datetime.utcnow()
     db.commit()
     db.refresh(review)
