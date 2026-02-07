@@ -9,7 +9,9 @@ import TaskMonitor from './components/TaskMonitor'
 import SettingsPanel from './components/SettingsPanel'
 import DeviceDashboard from './components/DeviceDashboard'
 import InventoryAnalytics from './components/InventoryAnalytics'
-import { Camera, Settings, Package, BarChart3, Home } from 'lucide-react'
+import ShoppingList from './components/ShoppingList'
+import ReviewQueue from './components/ReviewQueue'
+import { Camera, Settings, BarChart3, Home, ShoppingCart, ClipboardList } from 'lucide-react'
 import './App.css'
 
 function App() {
@@ -50,8 +52,8 @@ function App() {
   const updateStats = (items) => {
     const now = new Date()
     const expiringSoon = items.filter((item) => {
-      if (!item.expiry_date) return false
-      const expiryDate = new Date(item.expiry_date)
+      if (!item.expires_at) return false
+      const expiryDate = new Date(item.expires_at)
       const daysUntilExpiry = (expiryDate - now) / (1000 * 60 * 60 * 24)
       return daysUntilExpiry <= 3 && daysUntilExpiry > 0
     }).length
@@ -64,13 +66,9 @@ function App() {
     })
   }
 
-  const handleOverride = async (itemName, count, notes) => {
+  const handleOverride = async (payload) => {
     try {
-      await api.post('/v1/inventory/override', {
-        item_name: itemName,
-        count_estimate: count,
-        notes: notes,
-      })
+      await api.post('/v1/inventory/override', payload)
       await fetchInventory()
     } catch (err) {
       setError('Failed to update inventory: ' + err.message)
@@ -82,8 +80,8 @@ function App() {
       return
     }
     try {
-      await handleOverride(itemName, 0, 'deleted')
-      setInventory(inventory.filter(item => item.canonical_name !== itemName))
+      await handleOverride({ item_name: itemName, count_estimate: 0, notes: 'deleted' })
+      setInventory(inventory.filter((item) => item.canonical_name !== itemName))
     } catch (err) {
       setError('Failed to delete item: ' + err.message)
     }
@@ -91,7 +89,11 @@ function App() {
 
   const handleUpdateItemCount = async (itemName, newCount) => {
     try {
-      await handleOverride(itemName, newCount, `count updated to ${newCount}`)
+      await handleOverride({
+        item_name: itemName,
+        count_estimate: newCount,
+        notes: `count updated to ${newCount}`,
+      })
       await fetchInventory()
     } catch (err) {
       setError('Failed to update item: ' + err.message)
@@ -140,7 +142,7 @@ function App() {
           </div>
           
           {/* Navigation Tabs */}
-          <nav className="mt-4 flex gap-1 border-b border-gray-200">
+          <nav className="mt-4 flex flex-wrap gap-1 border-b border-gray-200">
             <button
               onClick={() => setCurrentView('inventory')}
               className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors ${
@@ -151,6 +153,28 @@ function App() {
             >
               <Home className="h-4 w-4" />
               Inventory
+            </button>
+            <button
+              onClick={() => setCurrentView('shopping')}
+              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors ${
+                currentView === 'shopping'
+                  ? 'border-b-2 border-green-500 text-green-600'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <ShoppingCart className="h-4 w-4" />
+              Shopping
+            </button>
+            <button
+              onClick={() => setCurrentView('reviews')}
+              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors ${
+                currentView === 'reviews'
+                  ? 'border-b-2 border-green-500 text-green-600'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <ClipboardList className="h-4 w-4" />
+              Checks
             </button>
             <button
               onClick={() => setCurrentView('devices')}
@@ -269,6 +293,12 @@ function App() {
             </div>
           </>
         )}
+
+        {/* Shopping View */}
+        {currentView === 'shopping' && <ShoppingList />}
+
+        {/* Manual Checks / Reviews */}
+        {currentView === 'reviews' && <ReviewQueue />}
 
         {/* Devices View */}
         {currentView === 'devices' && <DeviceDashboard />}

@@ -27,10 +27,10 @@ const InventoryList = ({ items, onDelete, onUpdate }) => {
     }
   })
 
-  const isExpiringSoon = (expiryDate) => {
-    if (!expiryDate) return false
+  const isExpiringSoon = (expiresAt) => {
+    if (!expiresAt) return false
     const now = new Date()
-    const expiry = new Date(expiryDate)
+    const expiry = new Date(expiresAt)
     const daysUntilExpiry = (expiry - now) / (1000 * 60 * 60 * 24)
     return daysUntilExpiry <= 3 && daysUntilExpiry > 0
   }
@@ -180,7 +180,7 @@ const InventoryList = ({ items, onDelete, onUpdate }) => {
                         Low Stock
                       </span>
                     )}
-                    {isExpiringSoon(item.expiry_date) && (
+                    {isExpiringSoon(item.expires_at) && (
                       <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-orange-100 text-orange-700 text-xs font-medium">
                         <AlertTriangle className="h-3 w-3" />
                         Expiring

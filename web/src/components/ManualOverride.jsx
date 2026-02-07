@@ -6,6 +6,9 @@ const ManualOverride = ({ onSubmit, existingItems = [] }) => {
   const [brand, setBrand] = useState('')
   const [packageType, setPackageType] = useState('other')
   const [count, setCount] = useState('')
+  const [location, setLocation] = useState('')
+  const [parLevel, setParLevel] = useState('')
+  const [expiresAt, setExpiresAt] = useState('')
   const [notes, setNotes] = useState('')
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
@@ -50,11 +53,21 @@ const ManualOverride = ({ onSubmit, existingItems = [] }) => {
         finalCount = Math.max(0, (existing?.count_estimate || 0) - countValue)
       }
 
-      await onSubmit(itemName, finalCount, notes || `${adjustment}: ${countValue}`)
+      await onSubmit({
+        item_name: itemName,
+        count_estimate: finalCount,
+        notes: notes || `${adjustment}: ${countValue}`,
+        location: location || undefined,
+        par_level: parLevel !== '' ? parseInt(parLevel) : undefined,
+        expires_at: expiresAt ? new Date(expiresAt).toISOString() : undefined,
+      })
       setItemName('')
       setBrand('')
       setPackageType('other')
       setCount('')
+      setLocation('')
+      setParLevel('')
+      setExpiresAt('')
       setNotes('')
       setAdjustment('set')
       setSuccess(true)
@@ -200,13 +213,51 @@ const ManualOverride = ({ onSubmit, existingItems = [] }) => {
         />
       </div>
 
+      {/* Home fields */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="col-span-3 sm:col-span-1">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+          <input
+            type="text"
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+            placeholder="pantry / fridge / freezer"
+            disabled={loading}
+            className="w-full px-3 py-2 rounded border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none disabled:bg-gray-50"
+          />
+        </div>
+        <div className="col-span-3 sm:col-span-1">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Par level</label>
+          <input
+            type="number"
+            value={parLevel}
+            onChange={(e) => setParLevel(e.target.value)}
+            min="0"
+            max="999"
+            disabled={loading}
+            placeholder="(min to keep)"
+            className="w-full px-3 py-2 rounded border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none disabled:bg-gray-50"
+          />
+        </div>
+        <div className="col-span-3 sm:col-span-1">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Expires</label>
+          <input
+            type="date"
+            value={expiresAt}
+            onChange={(e) => setExpiresAt(e.target.value)}
+            disabled={loading}
+            className="w-full px-3 py-2 rounded border border-gray-300 text-gray-900 focus:border-blue-500 focus:outline-none disabled:bg-gray-50"
+          />
+        </div>
+      </div>
+
       {/* Notes */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
         <textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          placeholder="e.g., 'Just restocked', 'Expiry: 2026-12-31'"
+          placeholder="Optional"
           rows="2"
           disabled={loading}
           className="w-full px-3 py-2 rounded border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none disabled:bg-gray-50"
