@@ -7,35 +7,51 @@ def test_ingest_requires_device(client):
     """Test that ingest requires valid device"""
     # Create a fake image
     fake_image = BytesIO(b"fake jpeg data")
-    
+
     response = client.post(
         "/v1/ingest",
         data={
             "device_id": "nonexistent-device",
+            "token": "nope",
             "timestamp": datetime.utcnow().isoformat(),
             "trigger_type": "door",
             "battery_v": 4.2,
             "rssi": -45,
         },
-        files={"image": ("test.jpg", fake_image, "image/jpeg")}
+        files={"image": ("test.jpg", fake_image, "image/jpeg")},
     )
     assert response.status_code == 401
     assert "Device not found" in response.json()["detail"]
 
+
 def test_ingest_valid_device(client, db):
     """Test successful image ingestion"""
+    from app.db.models import Device
+    from app.auth import TokenManager
+
+    # Create a device matching the request
+    token = "test-token"
+    device = Device(
+        id="test-device-001",
+        name="Test Camera",
+        token_hash=TokenManager.hash_token(token),
+    )
+    db.add(device)
+    db.commit()
+
     fake_image = BytesIO(b"fake jpeg data")
-    
+
     response = client.post(
         "/v1/ingest",
         data={
             "device_id": "test-device-001",
+            "token": token,
             "timestamp": datetime.utcnow().isoformat(),
             "trigger_type": "door",
             "battery_v": 4.2,
             "rssi": -45,
         },
-        files={"image": ("test.jpg", fake_image, "image/jpeg")}
+        files={"image": ("test.jpg", fake_image, "image/jpeg")},
     )
     assert response.status_code == 200
     data = response.json()
@@ -43,20 +59,33 @@ def test_ingest_valid_device(client, db):
     assert "capture_id" in data
     assert data["message"] is not None
 
-def test_ingest_invalid_timestamp(client):
+def test_ingest_invalid_timestamp(client, db):
     """Test that ingest validates timestamp format"""
+    from app.db.models import Device
+    from app.auth import TokenManager
+
+    token = "test-token"
+    device = Device(
+        id="test-device-001",
+        name="Test Camera",
+        token_hash=TokenManager.hash_token(token),
+    )
+    db.add(device)
+    db.commit()
+
     fake_image = BytesIO(b"fake jpeg data")
-    
+
     response = client.post(
         "/v1/ingest",
         data={
             "device_id": "test-device-001",
+            "token": token,
             "timestamp": "not-a-timestamp",
             "trigger_type": "door",
             "battery_v": 4.2,
             "rssi": -45,
         },
-        files={"image": ("test.jpg", fake_image, "image/jpeg")}
+        files={"image": ("test.jpg", fake_image, "image/jpeg")},
     )
     assert response.status_code == 400
     assert "Invalid timestamp format" in response.json()["detail"]
@@ -64,24 +93,35 @@ def test_ingest_invalid_timestamp(client):
 def test_ingest_updates_device_last_seen(client, db):
     """Test that ingest updates device metadata"""
     from app.db.models import Device
-    
+    from app.auth import TokenManager
+
+    token = "test-token"
+    device = Device(
+        id="test-device-001",
+        name="Test Camera",
+        token_hash=TokenManager.hash_token(token),
+    )
+    db.add(device)
+    db.commit()
+
     device = db.query(Device).filter_by(id="test-device-001").first()
     assert device.last_seen_at is None
-    
+
     fake_image = BytesIO(b"fake jpeg data")
     response = client.post(
         "/v1/ingest",
         data={
             "device_id": "test-device-001",
+            "token": token,
             "timestamp": datetime.utcnow().isoformat(),
             "trigger_type": "door",
             "battery_v": 4.1,
             "rssi": -50,
         },
-        files={"image": ("test.jpg", fake_image, "image/jpeg")}
+        files={"image": ("test.jpg", fake_image, "image/jpeg")},
     )
     assert response.status_code == 200
-    
+
     # Refresh device from DB
     db.expire(device)
     assert device.last_seen_at is not None

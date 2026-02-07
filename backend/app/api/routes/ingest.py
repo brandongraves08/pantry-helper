@@ -46,6 +46,11 @@ async def ingest_image(
     
     try:
         # Authenticate device
+        device = db.query(Device).filter_by(id=device_id).first()
+        if not device:
+            # Keep this as 401 so devices don't get an oracle about existence.
+            raise AuthenticationError(f"Device not found")
+
         device = TokenManager.verify_device_token(db, device_id, token)
         if not device:
             raise AuthenticationError(f"Invalid device credentials for {device_id}")

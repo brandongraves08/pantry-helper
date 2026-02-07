@@ -1,7 +1,9 @@
 """Tests for background capture processing"""
 
 import json
+from datetime import datetime
 from unittest.mock import Mock, patch
+
 from app.db.models import Capture, Device, Observation
 from app.models.schemas import VisionOutput, ObservationItem
 from app.workers.capture import CaptureProcessor
@@ -24,7 +26,7 @@ def test_process_capture_updates_status(db):
         id="test-capture",
         device_id=device.id,
         trigger_type="door",
-        captured_at="2026-01-15T10:00:00",
+        captured_at=datetime.fromisoformat("2026-01-15T10:00:00"),
         image_path="/tmp/test.jpg",
         status="stored",
     )
@@ -47,10 +49,8 @@ def test_process_capture_updates_status(db):
     )
     
     processor = CaptureProcessor()
-    with patch.object(processor.analyzer, 'analyze_image', return_value=mock_output):
-        # This would work if the image file existed
-        # For now, just test that the method exists
-        assert hasattr(processor, 'analyze_image')
+    # If OPENAI_API_KEY isn't set, analyzer will be None; just validate wiring.
+    assert hasattr(processor, "process_capture")
 
 
 def test_process_pending_captures(db):
@@ -68,7 +68,7 @@ def test_process_pending_captures(db):
             id=f"test-capture-{i}",
             device_id=device.id,
             trigger_type="door",
-            captured_at="2026-01-15T10:00:00",
+            captured_at=datetime.fromisoformat("2026-01-15T10:00:00"),
             image_path=f"/tmp/test{i}.jpg",
             status="stored",
         )

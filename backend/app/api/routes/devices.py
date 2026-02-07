@@ -164,7 +164,7 @@ async def get_device_health(
     day_ago = datetime.utcnow() - timedelta(days=1)
     captures_24h = len([c for c in recent_captures if c.created_at >= day_ago])
     
-    is_healthy = (
+    is_healthy = bool(
         device.last_seen_at and
         (datetime.utcnow() - device.last_seen_at) < timedelta(hours=1) and
         success_rate > 90

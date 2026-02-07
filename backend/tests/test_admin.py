@@ -1,5 +1,7 @@
 """Tests for admin endpoints"""
 
+from datetime import datetime
+
 from app.db.models import Device, Capture
 
 
@@ -26,7 +28,7 @@ def test_admin_stats_with_captures(client, db):
             id=f"cap-{i}",
             device_id=device.id,
             trigger_type="door",
-            captured_at="2026-01-15T10:00:00",
+            captured_at=datetime.fromisoformat("2026-01-15T10:00:00"),
             image_path=f"/tmp/test{i}.jpg",
             status=status,
         )
@@ -69,7 +71,7 @@ def test_admin_process_specific_capture(client, db):
         id="test-capture",
         device_id=device.id,
         trigger_type="door",
-        captured_at="2026-01-15T10:00:00",
+        captured_at=datetime.fromisoformat("2026-01-15T10:00:00"),
         image_path="/tmp/test.jpg",
         status="stored",
     )

@@ -1,14 +1,20 @@
 """Admin control endpoints for manual processing and system monitoring."""
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends
 from sqlalchemy.orm import Session
-from app.db.session import SessionLocal
+from app.db.database import get_db
 from app.db.models import (
     Capture,
     Device,
     Observation,
     InventoryEvent,
 )
+
+# Capture.status values (see app.db.models.Capture)
+STATUS_STORED = "stored"
+STATUS_ANALYZING = "analyzing"
+STATUS_COMPLETE = "complete"
+STATUS_FAILED = "failed"
 from app.workers.celery_app import (
     process_image_capture,
     process_pending_captures,
@@ -25,65 +31,61 @@ router = APIRouter()
 
 
 @router.get("/admin/stats")
-async def get_system_stats():
+async def get_system_stats(db: Session = Depends(get_db)):
     """Get system statistics and job queue status."""
-    db = SessionLocal()
+    # Database stats
+    device_count = db.query(Device).count()
+    capture_count = db.query(Capture).count()
+    observation_count = db.query(Observation).count()
+    event_count = db.query(InventoryEvent).count()
+
+    # Capture status breakdown
+    pending = db.query(Capture).filter(Capture.status == STATUS_STORED).count()
+    processing = db.query(Capture).filter(Capture.status == STATUS_ANALYZING).count()
+    completed = db.query(Capture).filter(Capture.status == STATUS_COMPLETE).count()
+    failed = db.query(Capture).filter(Capture.status == STATUS_FAILED).count()
+
+    # Get active tasks from Celery (optional; tests/dev may not have Redis running)
+    total_active = 0
+    total_reserved = 0
     try:
-        # Database stats
-        device_count = db.query(Device).count()
-        capture_count = db.query(Capture).count()
-        observation_count = db.query(Observation).count()
-        event_count = db.query(InventoryEvent).count()
-
-        # Capture status breakdown
-        pending = db.query(Capture).filter(
-            Capture.status == CaptureStatus.PENDING
-        ).count()
-        processing = db.query(Capture).filter(
-            Capture.status == CaptureStatus.PROCESSING
-        ).count()
-        completed = db.query(Capture).filter(
-            Capture.status == CaptureStatus.COMPLETED
-        ).count()
-        failed = db.query(Capture).filter(
-            Capture.status == CaptureStatus.FAILED
-        ).count()
-
-        # Get active tasks from Celery
         inspect = celery_app.control.inspect()
         active_tasks = inspect.active() or {}
         reserved_tasks = inspect.reserved() or {}
-        
         total_active = sum(len(tasks) for tasks in active_tasks.values())
         total_reserved = sum(len(tasks) for tasks in reserved_tasks.values())
+    except Exception as e:
+        logger.warning(f"Celery inspect unavailable (broker down?): {e}")
 
-        return {
-            "devices": device_count,
-            "captures": {
-                "total": capture_count,
-                "pending": pending,
-                "processing": processing,
-                "completed": completed,
-                "failed": failed,
-            },
-            "observations": observation_count,
-            "events": event_count,
-            "queue": {
-                "active_jobs": total_active,
-                "reserved_jobs": total_reserved,
-                "total_queued": total_active + total_reserved,
-            },
-            "rate_limits": {
-                "enabled": True,
-                "total_tracked": len(rate_limit_store.requests),
-            },
-        }
-    finally:
-        db.close()
+    return {
+        "devices": {"total": device_count},
+        "captures": {
+            "total": capture_count,
+            "pending": pending,
+            "processing": processing,
+            "completed": completed,
+            "failed": failed,
+        },
+        "observations": {"total": observation_count},
+        "events": {"total": event_count},
+        "queue": {
+            "active_jobs": total_active,
+            "reserved_jobs": total_reserved,
+            "total_queued": total_active + total_reserved,
+        },
+        "rate_limits": {
+            "enabled": True,
+            "total_tracked": len(rate_limit_store.requests),
+        },
+    }
 
 
 @router.post("/admin/process-capture/{capture_id}")
-async def process_capture(capture_id: str, sync: bool = Query(False)):
+async def process_capture(
+    capture_id: str,
+    sync: bool = Query(False),
+    db: Session = Depends(get_db),
+):
     """
     Process a single image capture.
     
@@ -91,117 +93,117 @@ async def process_capture(capture_id: str, sync: bool = Query(False)):
         capture_id: ID of capture to process
         sync: If True, wait for result; if False, queue asynchronously (default)
     """
-    db = SessionLocal()
-    try:
-        capture = db.query(Capture).filter(Capture.id == capture_id).first()
-        if not capture:
-            raise HTTPException(status_code=404, detail="Capture not found")
+    capture = db.query(Capture).filter(Capture.id == capture_id).first()
+    if not capture:
+        raise HTTPException(status_code=404, detail="Capture not found")
 
-        if sync:
-            # Process synchronously
-            try:
-                from app.services.vision import VisionAnalyzer
+    if sync:
+        # Process synchronously
+        try:
+            from app.services.vision import VisionAnalyzer
 
-                analyzer = VisionAnalyzer()
-                result = analyzer.analyze_image(capture.image_data)
+            analyzer = VisionAnalyzer()
+            result = analyzer.analyze_image(capture.image_path)
 
-                # Create observation
-                observation = Observation(
-                    capture_id=capture.id,
-                    device_id=capture.device_id,
-                    raw_json=result,
-                )
-                db.add(observation)
-                capture.status = CaptureStatus.COMPLETED
-                db.commit()
+            # Create observation
+            observation = Observation(
+                capture_id=capture.id,
+                raw_json=result.model_dump() if hasattr(result, "model_dump") else result,
+                scene_confidence=getattr(result, "scene_confidence", None),
+            )
+            db.add(observation)
+            capture.status = STATUS_COMPLETE
+            db.commit()
 
-                return {
-                    "capture_id": capture_id,
-                    "observation_id": observation.id,
-                    "status": "completed",
-                    "sync": True,
-                }
-            except Exception as e:
-                capture.status = CaptureStatus.FAILED
-                db.commit()
-                logger.error(f"Sync processing failed: {e}")
-                raise HTTPException(status_code=500, detail=str(e))
-        else:
-            # Queue async job
-            task = process_image_capture.delay(capture_id)
             return {
                 "capture_id": capture_id,
-                "task_id": task.id,
-                "status": "queued",
-                "sync": False,
+                "observation_id": observation.id,
+                "status": "completed",
+                "sync": True,
             }
-    finally:
-        db.close()
+        except Exception as e:
+            capture.status = STATUS_FAILED
+            db.commit()
+            logger.error(f"Sync processing failed: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+    else:
+        # Queue async job
+        task = process_image_capture.delay(capture_id)
+        return {
+            "capture_id": capture_id,
+            "task_id": task.id,
+            "status": "queued",
+            "sync": False,
+        }
 
 
 @router.post("/admin/process-pending")
-async def process_pending(sync: bool = Query(False)):
+async def process_pending(
+    sync: bool = Query(False),
+    limit: int = Query(100, ge=1, le=1000),
+    db: Session = Depends(get_db),
+):
     """
     Process all pending captures.
     
     Args:
         sync: If True, process synchronously; if False, queue batch job
     """
-    db = SessionLocal()
-    try:
-        pending = db.query(Capture).filter(
-            Capture.status == CaptureStatus.PENDING
-        ).all()
+    pending = (
+        db.query(Capture)
+        .filter(Capture.status == STATUS_STORED)
+        .limit(limit)
+        .all()
+    )
 
-        if not pending:
+    if not pending:
+        return {
+            "success": True,
+            "message": "No pending captures",
+            "processed": 0,
+            "sync": sync,
+        }
+
+    if sync:
+        # Process synchronously
+        processed = 0
+        try:
+            from app.services.vision import VisionAnalyzer
+
+            analyzer = VisionAnalyzer()
+            for capture in pending:
+                try:
+                    result = analyzer.analyze_image(capture.image_path)
+                    observation = Observation(
+                        capture_id=capture.id,
+                        raw_json=result.model_dump() if hasattr(result, "model_dump") else result,
+                        scene_confidence=getattr(result, "scene_confidence", None),
+                    )
+                    db.add(observation)
+                    capture.status = STATUS_COMPLETE
+                    processed += 1
+                except Exception as e:
+                    logger.error(f"Failed to process {capture.id}: {e}")
+                    capture.status = STATUS_FAILED
+
+            db.commit()
             return {
-                "message": "No pending captures",
-                "processed": 0,
-                "sync": sync,
+                "message": "Batch processing completed",
+                "processed": processed,
+                "sync": True,
             }
-
-        if sync:
-            # Process synchronously
-            processed = 0
-            try:
-                from app.services.vision import VisionAnalyzer
-
-                analyzer = VisionAnalyzer()
-                for capture in pending:
-                    try:
-                        result = analyzer.analyze_image(capture.image_data)
-                        observation = Observation(
-                            capture_id=capture.id,
-                            device_id=capture.device_id,
-                            raw_json=result,
-                        )
-                        db.add(observation)
-                        capture.status = CaptureStatus.COMPLETED
-                        processed += 1
-                    except Exception as e:
-                        logger.error(f"Failed to process {capture.id}: {e}")
-                        capture.status = CaptureStatus.FAILED
-
-                db.commit()
-                return {
-                    "message": "Batch processing completed",
-                    "processed": processed,
-                    "sync": True,
-                }
-            except Exception as e:
-                logger.error(f"Batch processing failed: {e}")
-                raise HTTPException(status_code=500, detail=str(e))
-        else:
-            # Queue batch job
-            task = process_pending_captures.delay()
-            return {
-                "task_id": task.id,
-                "message": "Batch processing queued",
-                "pending_count": len(pending),
-                "sync": False,
-            }
-    finally:
-        db.close()
+        except Exception as e:
+            logger.error(f"Batch processing failed: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+    else:
+        # Queue batch job
+        task = process_pending_captures.delay()
+        return {
+            "task_id": task.id,
+            "message": "Batch processing queued",
+            "pending_count": len(pending),
+            "sync": False,
+        }
 
 
 @router.get("/admin/task-status/{task_id}")

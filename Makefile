@@ -1,5 +1,12 @@
 .PHONY: help backend-install backend-run backend-test backend-migrate firmware-build firmware-upload web-install web-dev clean
 
+# Use a project-local virtualenv for Python deps (avoids PEP 668 / system Python issues)
+# Prefer python3.12 because some deps (e.g., psycopg2-binary) may not ship wheels for 3.14 yet.
+PYTHON ?= python3.12
+VENV := backend/venv
+PY := $(VENV)/bin/python
+PIP := $(VENV)/bin/pip
+
 help:
 	@echo "Pantry Inventory - Available targets:"
 	@echo ""
@@ -33,22 +40,23 @@ help:
 
 # Backend targets
 backend-install:
-	cd backend && pip install -r requirements.txt
+	@test -x $(PY) || $(PYTHON) -m venv $(VENV)
+	$(PIP) install -r backend/requirements.txt
 
-backend-run:
-	cd backend && python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+backend-run: backend-install
+	cd backend && ../$(PY) -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
-backend-test:
-	cd backend && python -m pytest tests/ -v
+backend-test: backend-install
+	cd backend && ../$(PY) -m pytest tests/ -v
 
-backend-migrate:
-	cd backend && python -m alembic upgrade head
+backend-migrate: backend-install
+	cd backend && ../$(PY) -m alembic upgrade head
 
-backend-migrate-down:
-	cd backend && python -m alembic downgrade -1
+backend-migrate-down: backend-install
+	cd backend && ../$(PY) -m alembic downgrade -1
 
-backend-seed:
-	cd backend && python scripts/seed_db.py seed
+backend-seed: backend-install
+	cd backend && ../$(PY) scripts/seed_db.py seed
 
 # Firmware targets
 firmware-build:
