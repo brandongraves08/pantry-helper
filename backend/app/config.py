@@ -18,11 +18,21 @@ class Settings(BaseSettings):
         "DATABASE_URL", "sqlite:///./pantry.db"
     )
 
+    # Vision Provider Configuration
+    VISION_PROVIDER: str = os.getenv("VISION_PROVIDER", "openai")
+    
     # OpenAI Configuration
     OPENAI_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY")
-    OPENAI_MODEL: str = "gpt-4-vision-preview"
+    OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-5")
     OPENAI_MAX_TOKENS: int = 1000
     OPENAI_TIMEOUT: int = 30
+    
+    # NVIDIA NIM Configuration
+    NVIDIA_NIM_API_KEY: Optional[str] = os.getenv("NVIDIA_NIM_API_KEY")
+    NVIDIA_MODEL: str = os.getenv("NVIDIA_MODEL", "moonshotai/kimi-k2.5")
+    # Gemini Configuration (for vision)
+    GEMINI_API_KEY: Optional[str] = os.getenv("GEMINI_API_KEY")
+    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
 
     # Redis Configuration (for job queue and caching)
     REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
@@ -53,6 +63,10 @@ class Settings(BaseSettings):
 
     # Logging Configuration
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "WARNING")
+    # Legacy .env compatibility (ignored but accepted)
+    IMAGES_DIR: Optional[str] = None
+    HOST: Optional[str] = None
+    PORT: Optional[str] = None
 
     class Config:
         env_file = ".env"

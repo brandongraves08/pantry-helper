@@ -4,21 +4,13 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: {
-    host: '0.0.0.0',
-    allowedHosts: [
-      'rhel-01.thelab.lan',
-      'localhost',
-      '.thelab.lan',
-    ],
+    port: 3000,
     proxy: {
-      '/v1': {
+      '/api': {
         target: 'http://localhost:8000',
         changeOrigin: true,
-      },
-      '/health': {
-        target: 'http://localhost:8000',
-        changeOrigin: true,
-      },
-    },
-  },
+        rewrite: (path) => path.replace(/^\/api/, '')
+      }
+    }
+  }
 })

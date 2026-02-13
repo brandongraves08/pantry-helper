@@ -1,0 +1,19 @@
+[Unit]
+Description=Pantry Inventory Camera Service
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/pantry-camera
+Environment="PANTRY_API_URL=http://192.168.1.100:8000/v1/ingest"
+Environment="PANTRY_DEVICE_ID=pantry-cam-001"
+Environment="PANTRY_DEVICE_TOKEN=F4l3yZqinCaePCckx-IDkKtnediBuNeY_pAd5J5b8qg"
+Environment="PANTRY_INTERVAL=3600"
+Environment="PYTHONUNBUFFERED=1"
+ExecStart=/home/pi/pantry-camera/venv/bin/python /home/pi/pantry-camera/capture_and_upload.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
