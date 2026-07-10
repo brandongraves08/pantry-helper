@@ -1,5 +1,11 @@
 # Pantry Inventory - Remaining Work & Roadmap
 
+> Current planning note (2026-07-08): this roadmap is historical and predates the live LXC deployment, production hardening, web UI completion, Nagios/NetBox integration, and Gemini removal. The active plan for the next phase is OpenClaw integration:
+>
+> `/home/brandon/.openclaw/workspace/plans/active/pantry-helper-openclaw-integration-plan.md`
+>
+> Current priorities are: OpenClaw skill/scripts, Discord digest/alerts, OpenAI key setup and vision smoke test, compact agent-facing API endpoints, ESP32 hardware onboarding, grocery/restock workflow, and Synology host-side bind mount.
+
 ## High Priority (Core Functionality)
 
 ### Backend

@@ -1,39 +1,44 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { MapPin, Plus, Trash2, Brain, Target, TrendingUp } from 'lucide-react';
+import * as api from '../api/client';
 
 export default function Zones() {
-  const [zones, setZones] = useState([
-    {
-      id: '4781b564-269a-4d69-bbc8-15e68b532225',
-      name: 'shelf_3_left',
-      x: 0.0,
-      y: 0.6,
-      width: 0.4,
-      height: 0.3,
-      expected_item_type: 'can',
-      is_active: true,
-    },
-  ]);
-  const [patterns, setPatterns] = useState([
-    {
-      zone_id: '4781b564-269a-4d69-bbc8-15e68b532225',
-      item_name: 'Tomatoes',
-      occurrence_count: 5,
-      confidence_score: 0.85,
-      avg_quantity: 4.0,
-    },
-  ]);
+  const [zones, setZones] = useState([]);
+  const [patterns, setPatterns] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadZones();
+  }, []);
+
+  const loadZones = async () => {
+    setLoading(true);
+    try {
+      const data = await api.listZones();
+      setZones(data || []);
+    } catch {
+      setZones([]);
+      setPatterns([]);
+    } finally {
+      setLoading(false);
+    }
+  };
   const [showAddZone, setShowAddZone] = useState(false);
 
-  const handleDeleteZone = (zoneId) => {
-    setZones(zones.filter(z => z.id !== zoneId));
+  const handleDeleteZone = async (zoneId) => {
+    try {
+      await api.deleteCapture(zoneId);
+      setZones(zones.filter(z => z.id !== zoneId));
+    } catch (err) {
+      console.error('Failed to delete zone:', err);
+    }
   };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Zones & ML Learning</h2>
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Zones & ML Learning</h2>
           <p className="text-sm text-gray-500">Configure shelf zones and view learned patterns</p>
         </div>
         <button
@@ -46,8 +51,8 @@ export default function Zones() {
       </div>
 
       {/* Zone Stats */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="bg-white rounded-xl border p-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="bg-white rounded-xl border p-4 sm:p-6">
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
               <MapPin size={20} />
@@ -56,7 +61,7 @@ export default function Zones() {
           </div>
           <p className="text-3xl font-bold text-gray-900">{zones.filter(z => z.is_active).length}</p>
         </div>
-        <div className="bg-white rounded-xl border p-6">
+        <div className="bg-white rounded-xl border p-4 sm:p-6">
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 bg-purple-50 rounded-lg text-purple-600">
               <Brain size={20} />
@@ -65,7 +70,7 @@ export default function Zones() {
           </div>
           <p className="text-3xl font-bold text-gray-900">{patterns.length}</p>
         </div>
-        <div className="bg-white rounded-xl border p-6">
+        <div className="bg-white rounded-xl border p-4 sm:p-6">
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 bg-green-50 rounded-lg text-green-600">
               <TrendingUp size={20} />
@@ -82,12 +87,12 @@ export default function Zones() {
 
       {/* Zones List */}
       <div className="bg-white rounded-xl border">
-        <div className="px-6 py-4 border-b">
+        <div className="px-4 sm:px-6 py-4 border-b">
           <h3 className="text-lg font-semibold text-gray-900">Shelf Zones</h3>
         </div>
         <div className="divide-y">
           {zones.map((zone) => (
-            <div key={zone.id} className="p-6">
+            <div key={zone.id} className="p-4 sm:p-6">
               <div className="flex items-start justify-between">
                 <div className="flex items-start gap-4">
                   <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center">

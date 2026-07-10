@@ -58,9 +58,9 @@ export default function SettingsPage() {
       </div>
 
       {/* Vision Models */}
-      <div className="bg-white rounded-xl border p-6">
+      <div className="bg-white rounded-xl border p-4 sm:p-6">
         <div className="flex items-center gap-3 mb-4">
-          <div className="p-2 bg-purple-50 rounded-lg text-purple-600">
+          <div className="p-2 bg-purple-50 rounded-lg text-purple-600 shrink-0">
             <Database size={20} />
           </div>
           <h3 className="text-lg font-semibold text-gray-900">Vision Models</h3>
@@ -95,9 +95,9 @@ export default function SettingsPage() {
       </div>
 
       {/* Notifications */}
-      <div className="bg-white rounded-xl border p-6">
+      <div className="bg-white rounded-xl border p-4 sm:p-6">
         <div className="flex items-center gap-3 mb-4">
-          <div className="p-2 bg-yellow-50 rounded-lg text-yellow-600">
+          <div className="p-2 bg-yellow-50 rounded-lg text-yellow-600 shrink-0">
             <Bell size={20} />
           </div>
           <h3 className="text-lg font-semibold text-gray-900">Notifications</h3>
@@ -124,9 +124,9 @@ export default function SettingsPage() {
       </div>
 
       {/* Security */}
-      <div className="bg-white rounded-xl border p-6">
+      <div className="bg-white rounded-xl border p-4 sm:p-6">
         <div className="flex items-center gap-3 mb-4">
-          <div className="p-2 bg-green-50 rounded-lg text-green-600">
+          <div className="p-2 bg-green-50 rounded-lg text-green-600 shrink-0">
             <Shield size={20} />
           </div>
           <h3 className="text-lg font-semibold text-gray-900">Security</h3>

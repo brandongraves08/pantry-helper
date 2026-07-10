@@ -19,8 +19,18 @@ class Settings(BaseSettings):
     )
 
     # Vision Provider Configuration
-    VISION_PROVIDER: str = os.getenv("VISION_PROVIDER", "openai")
+    VISION_PROVIDER: str = os.getenv("VISION_PROVIDER", "openclaw")
     
+    # OpenClaw Gateway Configuration
+    OPENCLAW_VISION_URL: str = os.getenv(
+        "OPENCLAW_VISION_URL",
+        "http://172.16.1.1:18790/analyze",
+    )
+    OPENCLAW_GATEWAY_TOKEN: Optional[str] = os.getenv("OPENCLAW_GATEWAY_TOKEN")
+    OPENCLAW_GATEWAY_TOKEN_FILE: Optional[str] = os.getenv("OPENCLAW_GATEWAY_TOKEN_FILE")
+    OPENCLAW_VISION_MODEL: str = os.getenv("OPENCLAW_VISION_MODEL", "openai/gpt-5.4-mini")
+    OPENCLAW_TIMEOUT: int = int(os.getenv("OPENCLAW_TIMEOUT", "120"))
+
     # OpenAI Configuration
     OPENAI_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY")
     OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-5")
@@ -30,10 +40,6 @@ class Settings(BaseSettings):
     # NVIDIA NIM Configuration
     NVIDIA_NIM_API_KEY: Optional[str] = os.getenv("NVIDIA_NIM_API_KEY")
     NVIDIA_MODEL: str = os.getenv("NVIDIA_MODEL", "moonshotai/kimi-k2.5")
-    # Gemini Configuration (for vision)
-    GEMINI_API_KEY: Optional[str] = os.getenv("GEMINI_API_KEY")
-    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
-
     # Redis Configuration (for job queue and caching)
     REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
@@ -71,6 +77,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = True
+        extra = "ignore"
 
 
 settings = Settings()

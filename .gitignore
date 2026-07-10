@@ -45,6 +45,7 @@ venv.bak/
 .env
 .env.local
 .env.*.local
+.env.tmp
 
 # Database
 *.db
@@ -76,6 +77,10 @@ web/.env.*.local
 # Logs
 *.log
 logs/
+
+# Backup directories
+*.bak.*
+*.bak/
 
 # OS
 .DS_Store

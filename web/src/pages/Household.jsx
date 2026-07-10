@@ -1,26 +1,35 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Users, Plus, User, AlertCircle, Apple, Activity } from 'lucide-react';
+import * as api from '../api/client';
 
 export default function Household() {
-  const [members, setMembers] = useState([
-    {
-      id: '1',
-      name: 'Brandon',
-      relationship: 'self',
-      restrictions: [],
-      nutrition: {
-        daily_calories: 2200,
-        daily_protein_g: 150,
-      },
-    },
-  ]);
+  const [members, setMembers] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [showAddMember, setShowAddMember] = useState(false);
+
+  useEffect(() => {
+    loadMembers();
+  }, []);
+
+  const loadMembers = async () => {
+    setLoading(true);
+    try {
+      const data = await api.listMembers();
+      setMembers(data || []);
+    } catch {
+      setMembers([
+        { id: '1', name: 'Brandon', relationship: 'self', restrictions: [], nutrition: { daily_calories: 2200, daily_protein_g: 150 } },
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Household</h2>
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Household</h2>
           <p className="text-sm text-gray-500">Manage members, allergies, and nutrition targets</p>
         </div>
         <button
@@ -33,8 +42,8 @@ export default function Household() {
       </div>
 
       {/* Household Stats */}
-      <div className="grid grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl border p-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="bg-white rounded-xl border p-4 sm:p-6">
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
               <Users size={20} />
@@ -43,7 +52,7 @@ export default function Household() {
           </div>
           <p className="text-3xl font-bold text-gray-900">{members.length}</p>
         </div>
-        <div className="bg-white rounded-xl border p-6">
+        <div className="bg-white rounded-xl border p-4 sm:p-6">
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 bg-red-50 rounded-lg text-red-600">
               <AlertCircle size={20} />
@@ -54,7 +63,7 @@ export default function Household() {
             {members.reduce((a, m) => a + m.restrictions.length, 0)}
           </p>
         </div>
-        <div className="bg-white rounded-xl border p-6">
+        <div className="bg-white rounded-xl border p-4 sm:p-6">
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 bg-green-50 rounded-lg text-green-600">
               <Apple size={20} />
@@ -67,7 +76,7 @@ export default function Household() {
               : 0}
           </p>
         </div>
-        <div className="bg-white rounded-xl border p-6">
+        <div className="bg-white rounded-xl border p-4 sm:p-6">
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 bg-purple-50 rounded-lg text-purple-600">
               <Activity size={20} />
@@ -82,12 +91,12 @@ export default function Household() {
 
       {/* Members List */}
       <div className="bg-white rounded-xl border">
-        <div className="px-6 py-4 border-b">
+        <div className="px-4 sm:px-6 py-4 border-b">
           <h3 className="text-lg font-semibold text-gray-900">Household Members</h3>
         </div>
         <div className="divide-y">
           {members.map((member) => (
-            <div key={member.id} className="p-6">
+            <div key={member.id} className="p-4 sm:p-6">
               <div className="flex items-start justify-between">
                 <div className="flex items-start gap-4">
                   <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
@@ -135,7 +144,7 @@ export default function Household() {
       </div>
 
       {/* Allergen Safety Panel */}
-      <div className="bg-yellow-50 rounded-xl border border-yellow-200 p-6">
+      <div className="bg-yellow-50 rounded-xl border border-yellow-200 p-4 sm:p-6">
         <div className="flex items-center gap-3 mb-4">
           <AlertCircle size={24} className="text-yellow-600" />
           <h3 className="text-lg font-semibold text-yellow-800">Allergen Safety</h3>
@@ -163,7 +172,7 @@ export default function Household() {
       {/* Add Member Modal (placeholder) */}
       {showAddMember && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 w-96">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md mx-4">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Add Member</h3>
             <p className="text-sm text-gray-500 mb-4">
               Member creation UI coming. Use API for now:

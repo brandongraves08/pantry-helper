@@ -1,135 +1,204 @@
-import os
-import uuid
+"""Ingest routes with structured logging."""
+import logging
 from datetime import datetime
-from fastapi import APIRouter, File, Form, UploadFile, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, Request
+from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from app.db.database import get_db
 from app.db.models import Device, Capture
-from app.models.schemas import CaptureResponse
-from app.auth import TokenManager
-from app.exceptions import (
-    DeviceNotFoundError,
-    AuthenticationError,
-    ValidationError,
-    StorageError,
-)
+from app.services.storage import get_storage_manager
+from app.auth import TokenManager, get_current_device, security
+
+logger = logging.getLogger("pantry-api.ingest")
 
 router = APIRouter()
 
-from app.services.storage import get_storage_manager
 
-@router.post("/ingest", response_model=CaptureResponse)
+@router.post("/ingest")
 async def ingest_image(
+    request: Request,
     device_id: str = Form(...),
-    timestamp: str = Form(...),
-    trigger_type: str = Form(...),
-    battery_v: float = Form(...),
-    rssi: int = Form(...),
-    token: str = Form(...),  # Device authentication token
+    token: str = Form(None),
+    timestamp: str = Form(None),
+    trigger_type: str = Form("manual"),
+    captured_at: str = Form(None),
+    battery_v: float = Form(None),
+    rssi: int = Form(None),
     image: UploadFile = File(...),
     db: Session = Depends(get_db),
+    authorization: HTTPAuthorizationCredentials = Depends(security),
 ):
-    """
-    Ingest an image from ESP32 device.
-    
-    Expected multipart form data:
-    - device_id: Device identifier
-    - token: Device authentication token
-    - timestamp: ISO 8601 timestamp
-    - trigger_type: door, light, timer, or manual
-    - battery_v: Battery voltage (float)
-    - rssi: WiFi signal strength (dBm)
-    - image: JPEG image file
-    """
-    
-    try:
-        # Authenticate device
-        device = db.query(Device).filter_by(id=device_id).first()
-        if not device:
-            # Keep this as 401 so devices don't get an oracle about existence.
-            raise AuthenticationError(f"Device not found")
+    logger.info("Ingest request", extra={
+        "device_id": device_id,
+        "trigger_type": trigger_type,
+        "upload_filename": image.filename,
+        "image_size": 0,
+    })
 
-        device = TokenManager.verify_device_token(db, device_id, token)
-        if not device:
-            raise AuthenticationError(f"Invalid device credentials for {device_id}")
+    # Verify device
+    db_device = db.query(Device).filter(Device.id == device_id).first()
+    if not db_device:
+        logger.warning("Unknown device", extra={"device_id": device_id})
+        raise HTTPException(status_code=401, detail="Device not found")
 
-        # Parse and validate timestamp
+    auth_token = authorization.credentials if authorization else token
+    if not auth_token or not TokenManager.verify_token(auth_token, db_device.token_hash):
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    capture_time = datetime.utcnow()
+    timestamp_value = captured_at or timestamp
+    if timestamp_value:
         try:
-            captured_at = datetime.fromisoformat(timestamp)
+            capture_time = datetime.fromisoformat(timestamp_value.replace("Z", "+00:00"))
         except ValueError:
-            raise ValidationError("Invalid timestamp format. Use ISO 8601.", field="timestamp")
+            raise HTTPException(status_code=400, detail="Invalid timestamp format")
 
-        # Validate trigger type
-        valid_triggers = {"door", "light", "timer", "manual"}
-        if trigger_type not in valid_triggers:
-            raise ValidationError(
-                f"Invalid trigger_type. Must be one of: {', '.join(valid_triggers)}",
-                field="trigger_type"
-            )
+    # Store image
+    content = await image.read()
+    if not content:
+        logger.error("Empty image from ESP32", extra={"device_id": device_id})
+        raise HTTPException(status_code=400, detail="Empty image payload")
 
-        # Validate battery voltage
-        if not (0 < battery_v < 10):
-            raise ValidationError("Battery voltage out of range (0-10V)", field="battery_v")
+    capture = Capture(
+        device_id=db_device.id,
+        trigger_type=trigger_type,
+        captured_at=capture_time,
+        image_path="pending",
+        battery_v=battery_v,
+        rssi=rssi,
+        status="stored",
+    )
+    db.add(capture)
+    db.flush()
 
-        # Validate RSSI
-        if not (-120 <= rssi <= 0):
-            raise ValidationError("RSSI out of range (-120 to 0 dBm)", field="rssi")
+    storage_mgr = get_storage_manager()
+    capture.image_path = storage_mgr.save_image(
+        device_id=db_device.id,
+        capture_id=capture.id,
+        image_data=content,
+    )
 
-        # Create capture record first to get capture_id for deterministic filename
-        capture = Capture(
-            device_id=device_id,
-            trigger_type=trigger_type,
-            captured_at=captured_at,
-            image_path="pending",
-            battery_v=battery_v,
-            rssi=rssi,
-            status="stored",
-        )
-        db.add(capture)
-        db.flush()  # assigns capture.id
+    db_device.last_seen_at = datetime.utcnow()
+    db_device.last_battery_v = battery_v
+    db_device.last_rssi = rssi
+    db.commit()
 
-        # Save image (to STORAGE_PATH/images/) and store relative path in DB
-        try:
-            content = await image.read()
-            if len(content) == 0:
-                raise ValidationError("Image file is empty", field="image")
+    logger.info("ESP32 capture stored", extra={
+        "capture_id": capture.id,
+        "device_id": device_id,
+        "image_size": len(content),
+        "battery_v": battery_v,
+        "rssi": rssi,
+    })
 
-            storage_mgr = get_storage_manager()
-            relative_path = storage_mgr.save_image(device_id=device_id, capture_id=capture.id, image_data=content)
-            capture.image_path = relative_path
-        except IOError as e:
-            raise StorageError(f"Failed to save image: {str(e)}")
-
-        # Update device last seen
-        device.last_seen_at = datetime.utcnow()
-        device.last_battery_v = battery_v
-        device.last_rssi = rssi
-
+    try:
+        from app.workers.celery_app import process_image_capture
+        process_image_capture.delay(capture.id)
+        logger.info("Capture queued from ESP32", extra={"capture_id": capture.id})
+    except Exception as e:
+        logger.error("Failed to queue ESP32 capture", extra={"capture_id": capture.id, "error": str(e)})
+        capture.error_message = f"Analysis queue failed: {e}"
         db.commit()
 
-        # Queue image processing task (async)
-        try:
-            from app.workers.celery_app import process_image_capture
-            process_image_capture.delay(capture.id)
-        except Exception as task_err:
-            # Log error but don't fail the request
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"Failed to queue processing task: {task_err}")
+    return {
+        "status": "stored",
+        "capture_id": capture.id,
+        "message": "Image received and queued for analysis",
+    }
 
-        return CaptureResponse(
-            capture_id=capture.id,
-            status="stored",
-            message="Image received and queued for analysis",
-        )
+
+@router.post("/ingest/barcode")
+async def ingest_barcode(
+    device_id: str = Form(...),
+    barcode: str = Form(...),
+    db: Session = Depends(get_db),
+    device: Device = Depends(get_current_device),
+):
+    """Accept a barcode number from ESP32 (or other device) for product lookup.
+
+    This endpoint allows an ESP32 with a connected barcode scanner module
+    to submit barcode values directly. The system looks up the barcode and
+    optionally auto-adds it to inventory.
+    """
+    logger.info("Barcode ingest from device", extra={
+        "device_id": device_id,
+        "barcode": barcode,
+    })
+
+    # Verify device
+    db_device = db.query(Device).filter(Device.id == device_id).first()
+    if not db_device:
+        raise HTTPException(status_code=401, detail="Unknown device")
+
+    from app.services.barcode import lookup_barcode
+    from app.db.models import BarcodeLookup
+
+    # Check cache first
+    existing = db.query(BarcodeLookup).filter(
+        BarcodeLookup.barcode == barcode.strip()
+    ).first()
+
+    if existing:
+        existing.lookup_count = (existing.lookup_count or 1) + 1
+        existing.last_lookup_at = datetime.utcnow()
+        db.commit()
+
+        logger.info("Barcode found in cache", extra={
+            "barcode": barcode,
+            "product": existing.product_name,
+        })
+
+        return {
+            "status": "ok",
+            "barcode": barcode,
+            "product_name": existing.product_name,
+            "brand": existing.brand,
+            "in_inventory": existing.inventory_item_id is not None,
+        }
+
+    # External lookup
+    try:
+        product = lookup_barcode(barcode)
+        if product.found:
+            bl = BarcodeLookup(
+                barcode=barcode.strip(),
+                product_name=product.product_name,
+                brand=product.brand,
+                category=product.category,
+                package_type=product.package_type,
+                image_url=product.image_url,
+                source=product.source,
+            )
+            db.add(bl)
+            db.commit()
+
+            logger.info("Barcode resolved from external lookup", extra={
+                "barcode": barcode,
+                "product": product.product_name,
+            })
+
+            return {
+                "status": "ok",
+                "barcode": barcode,
+                "product_name": product.product_name,
+                "brand": product.brand,
+                "in_inventory": False,
+            }
+
+        logger.info("Barcode not found in lookup", extra={"barcode": barcode})
+        return {
+            "status": "not_found",
+            "barcode": barcode,
+            "product_name": None,
+        }
 
     except Exception as e:
-        db.rollback()
-        # Re-raise our custom exceptions
-        if isinstance(e, (DeviceNotFoundError, AuthenticationError, ValidationError, StorageError)):
-            raise
-        # Log unexpected errors
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.error(f"Unexpected error in ingest: {str(e)}", exc_info=True)
-        raise
+        logger.error("Barcode lookup failed", extra={
+            "barcode": barcode,
+            "error": str(e),
+        })
+        return {
+            "status": "error",
+            "barcode": barcode,
+            "error": str(e),
+        }

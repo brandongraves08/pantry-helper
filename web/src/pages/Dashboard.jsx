@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Package, Camera, AlertCircle, MapPin, TrendingUp, RefreshCw } from 'lucide-react';
-import * as api from '../api';
+import * as api from '../api/client';
 
 export default function Dashboard() {
   const [stats, setStats] = useState({
@@ -19,18 +19,23 @@ export default function Dashboard() {
   const loadDashboardData = async () => {
     try {
       setLoading(true);
-      // Load data from multiple endpoints
-      const [inventoryRes, zonesRes] = await Promise.all([
-        api.getInventory().catch(() => ({ data: { items: [] } })),
-        api.getZones('pantry-cam-001').catch(() => ({ data: [] })),
+      const [inventoryData, capturesData, devicesData] = await Promise.all([
+        api.listInventory(),
+        api.listCaptures({ limit: 5 }),
+        api.listDevices(),
       ]);
 
+      const items = inventoryData?.items || [];
+      const captures = capturesData?.captures || [];
+      const devices = devicesData?.items || [];
+
       setStats({
-        totalItems: inventoryRes.data?.items?.length || 0,
-        recentCaptures: 3, // From our test runs
-        pendingReviews: 0,
-        activeZones: zonesRes.data?.length || 0,
+        totalItems: items.length,
+        recentCaptures: captures.filter(c => c.status === 'complete').length,
+        pendingReviews: captures.filter(c => c.status === 'analyzing').length,
+        activeZones: devices.filter(d => d.status === 'active').length || devices.length,
       });
+      setRecentCaptures(captures.slice(0, 3));
     } catch (err) {
       console.error('Failed to load dashboard:', err);
     } finally {
@@ -39,20 +44,20 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3 sm:space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900">Dashboard</h2>
+        <h2 className="text-lg sm:text-2xl font-bold text-gray-900">Dashboard</h2>
         <button
           onClick={loadDashboardData}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border rounded-lg hover:bg-gray-50"
+          className="flex items-center gap-1.5 px-2.5 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-gray-700 bg-white border rounded-lg hover:bg-gray-50"
         >
-          <RefreshCw size={16} />
-          Refresh
+          <RefreshCw size={14} />
+          <span className="hidden sm:inline">Refresh</span>
         </button>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
         <StatCard
           icon={Package}
           label="Total Items"
@@ -80,10 +85,10 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* Quick Actions */}
-      <div className="bg-white rounded-xl border p-6">
+      {/* Quick Actions — hidden on mobile, too much noise */}
+      <div className="hidden sm:block bg-white rounded-xl border p-4 sm:p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
           <QuickActionCard
             title="Upload Image"
             description="Process new pantry capture"
@@ -109,35 +114,39 @@ export default function Dashboard() {
       </div>
 
       {/* Recent Activity */}
-      <div className="grid grid-cols-2 gap-6">
-        <div className="bg-white rounded-xl border p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Captures</h3>
+      <div className="grid grid-cols-1 gap-4 sm:gap-6">
+        <div className="bg-white rounded-xl border p-3 sm:p-6">
+          <h3 className="text-sm sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Recent Captures</h3>
           <div className="space-y-3">
-            <CaptureItem id="26e52457-..." items={37} time="2 min ago" status="complete" />
-            <CaptureItem id="417129c7-..." items={13} time="5 min ago" status="complete" />
-            <CaptureItem id="62b9001b-..." items={19} time="8 min ago" status="complete" />
+            {recentCaptures.length === 0 ? (
+              <p className="text-gray-400 text-center py-4 sm:py-8 text-xs sm:text-sm">No captures yet</p>
+            ) : (
+              recentCaptures.map((c, i) => (
+                <CaptureItem key={c.id || i} id={c.id || ''} items={c.trigger_type || 'manual'} time={c.captured_at ? new Date(c.captured_at).toLocaleTimeString() : ''} status={c.status || 'stored'} />
+              ))
+            )}
           </div>
         </div>
 
-        <div className="bg-white rounded-xl border p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Low Stock Alerts</h3>
-          <div className="flex flex-col items-center justify-center h-40 text-gray-400">
-            <Package size={48} className="mb-2" />
-            <p>No low stock items</p>
-            <p className="text-sm">All items above par level</p>
+        <div className="bg-white rounded-xl border p-3 sm:p-6">
+          <h3 className="text-sm sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Low Stock Alerts</h3>
+          <div className="flex flex-col items-center justify-center h-24 sm:h-40 text-gray-400">
+            <Package size={32} className="sm:size-48 mb-1 sm:mb-2" />
+            <p className="text-xs sm:text-base">No low stock items</p>
+            <p className="text-xs sm:text-sm">All items above par level</p>
           </div>
         </div>
       </div>
 
-      {/* Zone ML Status */}
-      <div className="bg-white rounded-xl border p-6">
+      {/* Zone ML Status — hidden on mobile */}
+      <div className="hidden sm:block bg-white rounded-xl border p-4 sm:p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-900">ML Pattern Learning</h3>
           <span className="px-3 py-1 text-sm font-medium text-green-700 bg-green-100 rounded-full">
             Active
           </span>
         </div>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
           <div className="p-4 bg-gray-50 rounded-lg">
             <p className="text-sm text-gray-500">Zone</p>
             <p className="font-medium text-gray-900">shelf_3_left</p>
@@ -165,10 +174,10 @@ function StatCard({ icon: Icon, label, value, trend, color }) {
   };
 
   return (
-    <div className="bg-white rounded-xl border p-6">
+    <div className="bg-white rounded-xl border p-3 sm:p-6">
       <div className="flex items-center justify-between">
-        <div className={`p-3 rounded-lg ${colors[color]}`}>
-          <Icon size={24} />
+        <div className={`p-1.5 sm:p-3 rounded-lg ${colors[color]}`}>
+          <Icon size={16} className="sm:size-6" />
         </div>
         {trend && (
           <span className="flex items-center text-sm font-medium text-green-600">
@@ -177,8 +186,8 @@ function StatCard({ icon: Icon, label, value, trend, color }) {
           </span>
         )}
       </div>
-      <p className="mt-4 text-3xl font-bold text-gray-900">{value}</p>
-      <p className="text-sm text-gray-500">{label}</p>
+      <p className="mt-2 sm:mt-4 text-xl sm:text-3xl font-bold text-gray-900">{value}</p>
+      <p className="text-xs sm:text-sm text-gray-500">{label}</p>
     </div>
   );
 }
@@ -195,10 +204,10 @@ function QuickActionCard({ title, description, icon: Icon, href, color }) {
       href={href}
       className={`flex items-center gap-4 p-4 rounded-lg transition-colors ${colors[color]}`}
     >
-      <div className="p-3 bg-white rounded-lg shadow-sm">
+      <div className="p-3 bg-white rounded-lg shadow-sm shrink-0">
         <Icon size={24} />
       </div>
-      <div>
+      <div className="min-w-0">
         <h4 className="font-semibold text-gray-900">{title}</h4>
         <p className="text-sm text-gray-600">{description}</p>
       </div>
@@ -207,16 +216,30 @@ function QuickActionCard({ title, description, icon: Icon, href, color }) {
 }
 
 function CaptureItem({ id, items, time, status }) {
+  const statusColors = {
+    complete: 'bg-green-100 text-green-700',
+    analyzing: 'bg-yellow-100 text-yellow-700',
+    failed: 'bg-red-100 text-red-700',
+    stored: 'bg-blue-100 text-blue-700',
+  };
+  const dotColors = {
+    complete: 'bg-green-500',
+    analyzing: 'bg-yellow-500',
+    failed: 'bg-red-500',
+    stored: 'bg-blue-500',
+  };
+  const color = statusColors[status] || 'bg-gray-100 text-gray-700';
+  const dot = dotColors[status] || 'bg-gray-500';
   return (
     <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-      <div className="flex items-center gap-3">
-        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-        <div>
-          <p className="font-medium text-gray-900">Capture {id.slice(0, 8)}...</p>
-          <p className="text-sm text-gray-500">{items} items detected • {time}</p>
+      <div className="flex items-center gap-3 min-w-0">
+        <div className={`w-2 h-2 rounded-full ${dot} shrink-0`} />
+        <div className="min-w-0">
+          <p className="font-medium text-gray-900 truncate">Capture {(id || '').slice(0, 8)}...</p>
+          <p className="text-sm text-gray-500 truncate">{items} &bull; {time}</p>
         </div>
       </div>
-      <span className="px-2 py-1 text-xs font-medium text-green-700 bg-green-100 rounded">
+      <span className={`px-2 py-1 text-xs font-medium rounded ${color} shrink-0`}>
         {status}
       </span>
     </div>

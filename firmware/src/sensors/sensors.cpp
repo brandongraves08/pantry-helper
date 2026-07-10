@@ -2,7 +2,7 @@
 
 // GPIO pin assignments for ESP32-CAM
 const int DOOR_PIN = 33;        // Reed switch (GPIO33)
-const int LIGHT_PIN = 34;       // Analog light sensor (GPIO34 - ADC1_CH6)
+const int LIGHT_PIN = 12;       // Analog light sensor (GPIO12 - ADC2_CH2) - was GPIO34 but that conflicts with ESP32-CAM Y8
 
 // Sensor thresholds and timing
 const int LIGHT_THRESHOLD = 100;       // ADC value threshold for light

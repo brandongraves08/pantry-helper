@@ -2,7 +2,7 @@
 
 import logging
 from typing import List, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, HTTPException, Depends, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -160,13 +160,28 @@ async def get_device_health(
     
     success_rate = (successful / total_recent * 100) if total_recent > 0 else 0
     
-    # Get last 24 hours
+    # Get last 24 hours (defensive against both naive and aware datetimes)
     day_ago = datetime.utcnow() - timedelta(days=1)
-    captures_24h = len([c for c in recent_captures if c.created_at >= day_ago])
+    capture_24h_count = 0
+    for c in recent_captures:
+        ct = c.created_at
+        if ct is not None:
+            # Make naive-compatible if ct is aware
+            if ct.tzinfo is not None:
+                ct = ct.replace(tzinfo=None)
+            if ct >= day_ago:
+                capture_24h_count += 1
+    captures_24h = capture_24h_count
     
+    # Device health check (defensive timezone handling)
+    ls = device.last_seen_at
+    if ls is not None and ls.tzinfo is not None:
+        ls_naive = ls.replace(tzinfo=None)
+    else:
+        ls_naive = ls
     is_healthy = bool(
-        device.last_seen_at and
-        (datetime.utcnow() - device.last_seen_at) < timedelta(hours=1) and
+        ls_naive and
+        (datetime.utcnow() - ls_naive) < timedelta(hours=1) and
         success_rate > 90
     )
     
@@ -178,8 +193,8 @@ async def get_device_health(
         rssi=device.last_rssi,
         last_seen_at=device.last_seen_at,
         last_seen_ago_seconds=int(
-            (datetime.utcnow() - device.last_seen_at).total_seconds()
-        ) if device.last_seen_at else None,
+            (datetime.utcnow() - ls_naive).total_seconds()
+        ) if ls_naive else None,
         total_captures=db.query(Capture).filter(
             Capture.device_id == device.id
         ).count(),
@@ -408,13 +423,20 @@ async def get_device_captures(
 # Helper functions
 
 def _calculate_battery_percentage(voltage: Optional[float]) -> Optional[float]:
-    """Calculate battery percentage from voltage (LiPo 2S: 7.4V)."""
+    """Calculate battery percentage from voltage.
+    
+    Auto-detects cell count: <= 4.3V => 1S (3.0-4.2V),
+    otherwise 2S (6.0-8.4V).
+    """
     if voltage is None:
         return None
     
-    # LiPo 2S: 6.0V (0%) to 8.4V (100%)
-    MIN_V = 6.0
-    MAX_V = 8.4
+    if voltage <= 4.3:
+        # 1S LiPo: 3.0V (0%) to 4.2V (100%)
+        MIN_V, MAX_V = 3.0, 4.2
+    else:
+        # 2S LiPo: 6.0V (0%) to 8.4V (100%)
+        MIN_V, MAX_V = 6.0, 8.4
     
     if voltage < MIN_V:
         return 0.0
@@ -429,9 +451,12 @@ def _get_device_status(device: Device) -> str:
     """Determine device status based on last seen time."""
     if not device.last_seen_at:
         return "inactive"
-    
-    now = datetime.utcnow()
-    time_diff = now - device.last_seen_at
+
+    now = datetime.now(timezone.utc)
+    last_seen = device.last_seen_at
+    if last_seen.tzinfo is None:
+        last_seen = last_seen.replace(tzinfo=timezone.utc)
+    time_diff = now - last_seen
     
     if time_diff < timedelta(hours=1):
         return "active"

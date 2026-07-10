@@ -1,5 +1,4 @@
 # Backend Dockerfile
-# Dev + prod compatible (compose overrides command)
 FROM python:3.12-slim
 
 WORKDIR /app
@@ -11,6 +10,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 RUN apt-get update && apt-get install -y \
     gcc \
     curl \
+    zbar-tools \
+    libzbar0 \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
@@ -24,7 +25,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Create logs directory
-RUN mkdir -p logs && chown -R appuser:appuser /app
+RUN mkdir -p /data/storage logs && chown -R appuser:appuser /app /data
 
 USER appuser
 

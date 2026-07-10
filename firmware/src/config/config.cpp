@@ -12,11 +12,12 @@ char* Config::api_token = Config::settings.api_token;
 
 void Config::_init_defaults() {
     // Initialize settings with defaults
-    strcpy(Config::settings.ssid, "Mine!");
-    strcpy(Config::settings.password, "welcomehome");
+    // WARNING: These are placeholders. Configure via NVS/EEPROM in production.
+    strcpy(Config::settings.ssid, "IoT");
+    strcpy(Config::settings.password, "getoffmynetwork");
     strcpy(Config::settings.device_id, "pantry-cam-001");
-    strcpy(Config::settings.api_endpoint, "http://rhel-01.thelab.lan:8000/v1/ingest");
-    strcpy(Config::settings.api_token, "QyRNM2kDF8anvaemTJlddemFD5OMcWgErYFImZ7Jx38");
+    strcpy(Config::settings.api_endpoint, "http://192.168.2.143:8081/v1/ingest");
+    strcpy(Config::settings.api_token, "BXV5udbHWF8e5JvrtQ8fZgTHkqEq4XaosOZXLCx5_-A");
     Config::settings.light_threshold = 100;
     Config::settings.quiet_period_ms = 30000;
 }

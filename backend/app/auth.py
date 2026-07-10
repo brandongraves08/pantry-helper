@@ -1,49 +1,92 @@
-"""Authentication utilities for device token verification"""
-
+"""Authentication utilities for ESP32 device tokens."""
 import hashlib
+import hmac
 import secrets
-from typing import Optional
+import logging
+from fastapi import Header, HTTPException, Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
+from app.db.database import get_db
 from app.db.models import Device
 
+logger = logging.getLogger("pantry-api.auth")
+
+security = HTTPBearer(auto_error=False)
+
+
 class TokenManager:
-    """Manage device token generation and verification"""
-    
-    @staticmethod
-    def hash_token(token: str) -> str:
-        """Hash a device token using SHA256"""
-        return hashlib.sha256(token.encode()).hexdigest()
-    
+    """Manage device authentication tokens."""
+
     @staticmethod
     def generate_token() -> str:
-        """Generate a random secure device token"""
+        """Generate a secure random token for device registration."""
         return secrets.token_urlsafe(32)
-    
+
     @staticmethod
-    def verify_device_token(
-        db: Session,
-        device_id: str,
-        token: str,
-    ) -> Optional[Device]:
-        """
-        Verify a device token and return the device if valid.
-        
-        Args:
-            db: Database session
-            device_id: Device ID
-            token: Device token (unhashed)
-            
-        Returns:
-            Device object if token is valid, None otherwise
-        """
-        device = db.query(Device).filter_by(id=device_id).first()
-        
-        if not device:
+    def hash_token(token: str) -> str:
+        """Hash a token for storage using SHA-256."""
+        return hashlib.sha256(token.encode()).hexdigest()
+
+    @staticmethod
+    def verify_token(token: str, token_hash: str) -> bool:
+        """Constant-time comparison of token against stored hash."""
+        return hmac.compare_digest(
+            TokenManager.hash_token(token), token_hash
+        )
+
+
+def get_current_device(
+    authorization: HTTPAuthorizationCredentials = Depends(security),
+    device_id: str = Header(None, alias="X-Device-ID"),
+    db: Session = Depends(get_db),
+) -> Device:
+    """Authenticate a device using Bearer token + optional X-Device-ID header."""
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Missing Authorization header")
+
+    token = authorization.credentials
+
+    if device_id:
+        device = db.query(Device).filter(Device.id == device_id).first()
+    else:
+        # Try to find device by trying all token hashes
+        devices = db.query(Device).all()
+        for device in devices:
+            if TokenManager.verify_token(token, device.token_hash):
+                return device
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    if not device:
+        raise HTTPException(status_code=401, detail="Device not found")
+
+    if not TokenManager.verify_token(token, device.token_hash):
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    return device
+
+
+def authenticate_device(
+    token: str,
+    device_id: str = None,
+    db: Session = None,
+) -> Device:
+    """Direct authentication for non-FastAPI contexts."""
+    if not db:
+        from app.db.database import SessionLocal
+        db = SessionLocal()
+
+    try:
+        if device_id:
+            device = db.query(Device).filter(Device.id == device_id).first()
+        else:
+            devices = db.query(Device).all()
+            for device in devices:
+                if TokenManager.verify_token(token, device.token_hash):
+                    return device
             return None
-        
-        # Constant-time comparison to prevent timing attacks
-        expected_hash = TokenManager.hash_token(token)
-        if secrets.compare_digest(expected_hash, device.token_hash):
+
+        if device and TokenManager.verify_token(token, device.token_hash):
             return device
-        
         return None
+    finally:
+        db.close()

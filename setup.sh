@@ -1,196 +1,79 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# Pantry Helper — Setup Script
+# Usage: ./setup.sh [--docker]
 
-# Pantry Helper - Setup Script
-# This script sets up the development environment for the pantry inventory system
+set -euo pipefail
 
-set -e
+ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$ROOT_DIR"
 
-echo "🥫 Pantry Helper - Setup Script"
-echo "================================"
-echo ""
+echo "🍅 Pantry Helper Setup"
+echo "━━━━━━━━━━━━━━━━━━━━"
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
-
-# Helper functions
-info() {
-    echo -e "${BLUE}ℹ${NC} $1"
-}
-
-success() {
-    echo -e "${GREEN}✓${NC} $1"
-}
-
-warning() {
-    echo -e "${YELLOW}⚠${NC} $1"
-}
-
-error() {
-    echo -e "${RED}✗${NC} $1"
-}
-
-# Check Python version
-info "Checking Python installation..."
-if ! command -v python3 &> /dev/null; then
-    error "Python 3 is not installed. Please install Python 3.9 or higher."
-    exit 1
-fi
-
-PYTHON_VERSION=$(python3 -c 'import sys; print(".".join(map(str, sys.version_info[:2])))')
-info "Found Python ${PYTHON_VERSION}"
-
-# Check if pip is available
-info "Checking pip installation..."
-if ! python3 -m pip --version &> /dev/null; then
-    warning "pip not found, installing pip..."
+if [[ "${1:-}" == "--docker" ]]; then
+    echo "🐳 Setting up with Docker..."
     
-    # Try to install pip using ensurepip
-    if python3 -m ensurepip --version &> /dev/null; then
-        python3 -m ensurepip --default-pip
-        success "pip installed via ensurepip"
-    else
-        # Download and install pip manually
-        info "Downloading pip installer..."
-        curl -sS https://bootstrap.pypa.io/get-pip.py -o /tmp/get-pip.py
-        python3 /tmp/get-pip.py --user
-        rm /tmp/get-pip.py
-        success "pip installed manually"
+    # Check .env
+    if [ ! -f .env ]; then
+        cp .env.docker.example .env
+        echo "⚠️  Created .env from .env.docker.example — configure your API keys"
     fi
-else
-    success "pip is available"
-fi
-
-# Check if we're in the right directory
-if [ ! -f "Makefile" ] || [ ! -d "backend" ]; then
-    error "Please run this script from the project root directory"
-    exit 1
-fi
-
-success "Project root detected"
-
-# Setup Python virtual environment
-info "Setting up Python virtual environment..."
-if [ ! -d "venv" ]; then
-    python3 -m venv venv
-    success "Virtual environment created"
-else
-    info "Virtual environment already exists"
-fi
-
-# Activate virtual environment
-source venv/bin/activate
-success "Virtual environment activated"
-
-# Upgrade pip
-info "Upgrading pip..."
-python -m pip install --upgrade pip setuptools wheel -q
-success "pip upgraded"
-
-# Install backend dependencies
-info "Installing backend dependencies..."
-cd backend
-python -m pip install -r requirements.txt -q
-cd ..
-success "Backend dependencies installed"
-
-# Setup environment file
-info "Setting up environment configuration..."
-if [ ! -f "backend/.env" ]; then
-    cp backend/.env.example backend/.env
-    success "Created backend/.env from example"
-    warning "Please edit backend/.env and add your API key:"
-    warning "  - For OpenAI: Set OPENAI_API_KEY=sk-..."
-    warning "  - For Gemini: Set GEMINI_API_KEY=... and VISION_PROVIDER=gemini"
-else
-    info "backend/.env already exists"
-fi
-
-# Create storage directory
-info "Creating storage directories..."
-mkdir -p storage/images
-success "Storage directories created"
-
-# Initialize database
-info "Initializing database..."
-cd backend
-python -m alembic upgrade head 2>/dev/null || {
-    warning "Alembic migrations not found, creating tables directly"
-    python -c "from app.db.database import engine, Base; from app.db.models import *; Base.metadata.create_all(bind=engine)"
-}
-cd ..
-success "Database initialized"
-
-# Seed test data
-info "Seeding test devices..."
-cd backend
-python scripts/seed_db.py seed 2>/dev/null || warning "Seed script not available or already run"
-cd ..
-
-# Check for Node.js
-info "Checking Node.js installation..."
-if ! command -v node &> /dev/null; then
-    warning "Node.js is not installed. Web UI setup will be skipped."
-    warning "Install Node.js 16+ to enable web UI development"
-else
-    NODE_VERSION=$(node -v)
-    info "Found Node ${NODE_VERSION}"
     
-    # Install web dependencies
-    info "Installing web UI dependencies..."
-    cd web
+    echo "Starting Docker services..."
+    docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+    echo "✅ Services running!"
+    echo "   API:   http://localhost:8000"
+    echo "   Web:   http://localhost:3000"
+    echo "   Docs:  http://localhost:8000/docs"
+    echo ""
+    echo "Next: create a test device:"
+    echo "  docker compose exec backend python register_device.py --name pantry-cam-001"
+    exit 0
+fi
+
+echo "📦 Setting up for local development..."
+
+# Backend
+echo ""
+echo "→ Backend (Python)"
+cd "$ROOT_DIR/backend"
+
+if [ ! -d venv ]; then
+    python3 -m venv venv
+fi
+source venv/bin/activate
+pip install -q -r requirements.txt
+
+# Copy .env if needed
+if [ ! -f .env ]; then
+    cp .env.example .env
+    echo "⚠️  Created backend/.env from .env.example — configure your API keys"
+fi
+
+# Check for DB
+if [ ! -f pantry.db ]; then
+    echo "   Creating SQLite database..."
+    python3 -c "from app.db.database import engine, Base; Base.metadata.create_all(bind=engine)" 2>/dev/null || true
+fi
+
+cd "$ROOT_DIR"
+
+# Web UI
+echo ""
+echo "→ Web UI"
+cd "$ROOT_DIR/web"
+if [ ! -d node_modules ]; then
     npm install
-    cd ..
-    success "Web UI dependencies installed"
 fi
 
-# Check for PlatformIO (optional)
-info "Checking PlatformIO installation..."
-if ! command -v pio &> /dev/null; then
-    warning "PlatformIO CLI not found. Firmware development will be unavailable."
-    warning "Install with: pip install platformio"
-else
-    success "PlatformIO CLI found"
-fi
+cd "$ROOT_DIR"
 
 echo ""
-echo "================================"
-echo -e "${GREEN}✓ Setup Complete!${NC}"
-echo "================================"
+echo "✅ Local setup complete!"
 echo ""
-echo "Next steps:"configure your Vision AI provider:"
+echo "To start, run in three terminals:"
+echo "  Terminal 1:  cd backend && source venv/bin/activate && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000"
+echo "  Terminal 2:  cd web && npm run dev"
 echo ""
-echo "   For OpenAI (default):"
-echo -e "   ${BLUE}VISION_PROVIDER=openai${NC}"
-echo -e "   ${BLUE}OPENAI_API_KEY='sk-your-key-here'${NC}"
-echo ""
-echo "   For Google Gemini:"
-echo -e "   ${BLUE}VISION_PROVIDER=gemini${NC}"
-echo -e "   ${BLUE}GEMINI_API_KEY='your-gemini-key-here'${NC}"
-echo ""
-echo "2. Start the backend API:"
-echo -e "   ${BLUE}make backend-run${NC}"
-echo "   API will be available at http://localhost:8000"
-echo "   API docs at http://localhost:8000/docs"
-echo ""
-echo "3. Start the web UI (in another terminal):"
-echo -e "   ${BLUE}make web-dev${NC}"
-echo "   UI will be available at http://localhost:5173"
-echo ""
-echo "4. Test devices created:"
-echo "   - pantry-cam-001 (Kitchen Pantry)"
-echo "   - pantry-cam-002 (Garage Storage)"
-echo ""
-echo "For detailed documentation, see:"
-echo "  - README.md - Quick start guide"
-echo "  - ARCHITECTURE.md - System design"
-echo "  - BUILD_STATUS.md - Current statu
-echo "  - ARCHITECTURE.md - System design"
-echo "  - DEVELOPMENT.md - Development workflows"
-echo ""
-
-# Deactivate venv for now
-deactivate 2>/dev/null || true
+echo "Or use the API directly:"
+echo "  curl http://localhost:8000/health"

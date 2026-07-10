@@ -6,12 +6,19 @@ services:
     restart: always
     environment:
       POSTGRES_USER: ${DB_USER:-pantry}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-pantry_secure_pass}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-pantry_pass}
       POSTGRES_DB: ${DB_NAME:-pantry_db}
-    ports:
-      - "5432:5432"
+    # No host port exposure - accessed via Docker network
+    expose:
+      - "5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    logging: &default-logging
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        tag: "{{.Name}}"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-pantry}"]
       interval: 10s
@@ -25,10 +32,9 @@ services:
     image: redis:7-alpine
     container_name: pantry-redis
     restart: always
-    ports:
-      - "6379:6379"
     volumes:
       - redis_data:/data
+    logging: *default-logging
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -45,29 +51,34 @@ services:
     container_name: pantry-api
     restart: always
     environment:
-      DATABASE_URL: postgresql://${DB_USER:-pantry}:${DB_PASSWORD:-pantry_secure_pass}@db:5432/${DB_NAME:-pantry_db}
+      DATABASE_URL: postgresql://${DB_USER:-pantry}:${DB_PASSWORD:-pantry_pass}@db:5432/${DB_NAME:-pantry_db}
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
-      # Storage (shared with worker)
       STORAGE_PATH: /data/storage
-      VISION_PROVIDER: ${VISION_PROVIDER:-openai}
+      VISION_PROVIDER: ${VISION_PROVIDER:-openclaw}
+      OPENCLAW_VISION_URL: ${OPENCLAW_VISION_URL:-http://172.16.1.1:18790/analyze}
+      OPENCLAW_GATEWAY_TOKEN_FILE: ${OPENCLAW_GATEWAY_TOKEN_FILE:-/run/secrets/openclaw_gateway_token}
+      OPENCLAW_VISION_MODEL: ${OPENCLAW_VISION_MODEL:-openai/gpt-5.4-mini}
+      OPENCLAW_TIMEOUT: ${OPENCLAW_TIMEOUT:-120}
+      NVIDIA_NIM_API_KEY: ${NVIDIA_NIM_API_KEY}
+      NVIDIA_MODEL: ${NVIDIA_MODEL:-meta/llama-3.2-11b-vision-instruct}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o}
-      GEMINI_API_KEY: ${GEMINI_API_KEY}
-      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-1.5-flash}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       DEBUG: ${DEBUG:-false}
+      SERVICE_NAME: pantry-api
     ports:
-      - "8000:8000"
+      - "8200:8000"
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
     volumes:
-      - ./backend:/app
       - ./data/storage:/data/storage
+      - /home/brandon/.openclaw/secrets/openclaw.gateway.token:/run/secrets/openclaw_gateway_token:ro
+    logging: *default-logging
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     networks:
       - pantry-network
@@ -86,25 +97,37 @@ services:
     container_name: pantry-worker
     restart: always
     environment:
-      DATABASE_URL: postgresql://${DB_USER:-pantry}:${DB_PASSWORD:-pantry_secure_pass}@db:5432/${DB_NAME:-pantry_db}
+      DATABASE_URL: postgresql://${DB_USER:-pantry}:${DB_PASSWORD:-pantry_pass}@db:5432/${DB_NAME:-pantry_db}
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
       STORAGE_PATH: /data/storage
-      VISION_PROVIDER: ${VISION_PROVIDER:-openai}
+      VISION_PROVIDER: ${VISION_PROVIDER:-openclaw}
+      OPENCLAW_VISION_URL: ${OPENCLAW_VISION_URL:-http://172.16.1.1:18790/analyze}
+      OPENCLAW_GATEWAY_TOKEN_FILE: ${OPENCLAW_GATEWAY_TOKEN_FILE:-/run/secrets/openclaw_gateway_token}
+      OPENCLAW_VISION_MODEL: ${OPENCLAW_VISION_MODEL:-openai/gpt-5.4-mini}
+      OPENCLAW_TIMEOUT: ${OPENCLAW_TIMEOUT:-120}
+      NVIDIA_NIM_API_KEY: ${NVIDIA_NIM_API_KEY}
+      NVIDIA_MODEL: ${NVIDIA_MODEL:-meta/llama-3.2-11b-vision-instruct}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o}
-      GEMINI_API_KEY: ${GEMINI_API_KEY}
-      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-1.5-flash}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      SERVICE_NAME: pantry-worker
     depends_on:
       - db
       - redis
       - backend
     volumes:
-      - ./backend:/app
       - ./data/storage:/data/storage
+      - /home/brandon/.openclaw/secrets/openclaw.gateway.token:/run/secrets/openclaw_gateway_token:ro
+    logging: *default-logging
     command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=4
+    healthcheck:
+      test: ["CMD-SHELL", "grep -qa 'celery' /proc/1/cmdline && grep -qa 'worker' /proc/1/cmdline || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
     networks:
       - pantry-network
 
@@ -119,30 +142,51 @@ services:
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
     ports:
-      - "5555:5555"
+      - "5557:5555"
     depends_on:
       - redis
       - celery_worker
+    logging: *default-logging
     command: celery -A app.workers.celery_app flower --port=5555 --broker=redis://redis:6379/0
     networks:
       - pantry-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5555/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   # React Frontend
   web:
     build:
       context: ./web
       dockerfile: Dockerfile
+      target: prod
+      args:
+        VITE_API_URL: http://pantry-helper.thelab.lan:8000
     container_name: pantry-web
     ports:
-      - "3000:5173"
+      - "3300:80"
     environment:
-      VITE_API_URL: http://localhost:8000
+      VITE_API_URL: http://pantry-helper.thelab.lan:8000
     depends_on:
       - backend
+    logging: *default-logging
+    networks:
+      - pantry-network
+
+  # Promtail - Docker log shipping to Loki
+  promtail:
+    image: grafana/promtail:latest
+    container_name: pantry-promtail
+    restart: always
     volumes:
-      - ./web:/app
-      - /app/node_modules
-    command: npm run dev -- --host
+      - /var/log:/var/log:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - ./ops/promtail-config.yml:/etc/promtail/config.yml:ro
+    logging: *default-logging
+    command: -config.file=/etc/promtail/config.yml
     networks:
       - pantry-network
 
