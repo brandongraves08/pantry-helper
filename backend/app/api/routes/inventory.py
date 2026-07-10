@@ -1,9 +1,11 @@
+import csv
+import io
+import os
 from datetime import datetime
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.orm import Session
-import os
 
 from app.db.database import get_db
 from app.db.models import InventoryState, InventoryItem, Location, ShoppingListItem as ShoppingListItemModel, InventoryReview
@@ -123,6 +125,59 @@ async def get_inventory_item_image(item_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Image file missing")
     
     return FileResponse(image_path, media_type="image/jpeg")
+
+
+@router.get("/inventory/export/csv")
+async def export_inventory_csv(db: Session = Depends(get_db)):
+    """Export inventory as CSV file download."""
+    states = db.query(InventoryState).all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    # Header row
+    writer.writerow([
+        "Item ID", "Name", "Brand", "Package Type", "Category", "Unit",
+        "Count", "Confidence", "Last Seen", "Location", "Expires At",
+        "Opened At", "Par Level", "Manual Entry", "Notes",
+    ])
+
+    for state in states:
+        if state.confidence <= 0:
+            continue
+
+        loc_name = ""
+        if hasattr(state, "location") and state.location:
+            loc_name = state.location.name
+
+        writer.writerow([
+            state.item.id,
+            state.item.canonical_name,
+            state.item.brand or "",
+            state.item.package_type or "",
+            getattr(state.item, "category", "") or "",
+            getattr(state.item, "unit", "") or "",
+            state.count_estimate,
+            state.confidence,
+            state.last_seen_at.isoformat() if state.last_seen_at else "",
+            loc_name,
+            state.expires_at.isoformat() if hasattr(state, "expires_at") and state.expires_at else "",
+            state.opened_at.isoformat() if hasattr(state, "opened_at") and state.opened_at else "",
+            getattr(state, "par_level", "") or "",
+            "Yes" if state.is_manual else "No",
+            state.notes or "",
+        ])
+
+    csv_content = output.getvalue()
+    output.close()
+
+    filename = f"pantry-inventory-{datetime.utcnow().strftime('%Y%m%d')}.csv"
+
+    return StreamingResponse(
+        iter([csv_content]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
 
 
 @router.get("/inventory/history")

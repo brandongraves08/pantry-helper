@@ -48,9 +48,7 @@
 
 ## 📋 Medium Priority
 
-- **Image retention policy** — Auto-delete images older than X days
 - **Confidence tuning** — Fine-tune vision prompts & thresholds per category
-- **Inventory history queries** — Advanced filtering, CSV export
 - **Device management UI** — Health metrics, settings, de-registration
 - **Mobile responsiveness** — Current: partially responsive
 - **User auth** — Login/logout, user roles (if needed beyond single-family)
