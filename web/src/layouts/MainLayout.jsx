@@ -34,7 +34,7 @@ const Sidebar = ({ isOpen, onClose }) => {
     { path: '/inventory', label: 'Inventory', icon: Package },
     { path: '/zones', label: 'Zones', icon: MapPin },
     { path: '/devices', label: 'Devices', icon: Settings },
-    { path: '/members', label: 'Members', icon: Users },
+    { path: '/household', label: 'Household', icon: Users },
   ]
 
   return (
