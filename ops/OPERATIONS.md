@@ -85,10 +85,26 @@ sudo pct exec 202 -- journalctl -u pantry-helper-backup.service --no-pager -n 50
 
 ## Monitoring
 
-- **Nagios:** API (port 8000), Web (port 3000), Flower (port 5555) — all checked from `loki.thelab.lan`
-- **NetBox:** device `pantry-helper`, primary IPv4 `192.168.2.202/24`
-- **Loki/Promtail:** `pantry-promtail` ships all Docker container logs to `loki.thelab.lan:3100`
-- **Docker healthchecks:** All services have `healthcheck` stanzas; unhealthy containers are reported through Nagios
+### NetBox (Source of Truth)
+- **VM:** `pantry-helper` (ID 21), cluster `proxmox-02`, role `Container`
+- **Primary IPv4:** `192.168.2.202/24` assigned to `eth0` virtual interface (ID 11)
+- **Tags:** `lxc`, `docker`
+
+### Nagios
+- **⚠️ NOT YET CONFIGURED** — NCPA agent v2.x is installed and running on the LXC (port 5693, HTTPS)
+- UFW rule added: `192.168.0.0/16` allowed to port 5693/tcp
+- NCPA community_string: stored in LXC `/usr/local/ncpa/etc/ncpa.cfg`
+- Requires adding the Nagios host definition and service checks from `loki.thelab.lan`
+
+### Loki / Promtail
+- `pantry-promtail` ships all Docker container logs to `loki.thelab.lan:3100`
+- All containers emit structured JSON logs to stdout/stderr
+- Nginx uses JSON format with upstream response info
+- API middleware logs request IDs, timing, and status for every request
+
+### Docker Healthchecks
+- All services have `healthcheck` stanzas
+- Health endpoints: `http://pantry-helper.thelab.lan:8000/health` (API), `:3000` (web)
 
 ## Configuration
 
@@ -134,8 +150,6 @@ Unprivileged LXC prevents direct NFS mount. Need a Proxmox host-side bind mount 
 
 ## OpenClaw Integration
 
-- **Skill:** `skills/pantry-helper/SKILL.md`
-- **Scripts:** `skills/pantry-helper/scripts/` (pantry_status, pantry_api, pantry_report)
-- **Plan:** `plans/active/pantry-helper-openclaw-integration-plan.md`
-- **Cron jobs:** Daily digest (pantry state, low-stock, expiry, health)
-- **Vision routing:** Uses the OpenClaw vision bridge (`http://172.16.1.1:18790/analyze`) for recognition
+- **OpenClaw Project Plan:** `~/.openclaw/workspace/projects/pantry-helper/plan.json`
+- **Check-in cron:** Weekly (Monday 5pm CT) — `checkin:pantry-helper`
+- **Vision routing:** Currently configured as `VISION_PROVIDER=nvidia` on the LXC (NVIDIA NIM). Local dev config uses `openclaw`
