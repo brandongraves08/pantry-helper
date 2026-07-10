@@ -77,6 +77,26 @@ export const getDevice = async (id) => {
   return data
 }
 
+export const getDeviceHealth = async (id) => {
+  const { data } = await apiClient.get(`/v1/devices/${id}/health`)
+  return data
+}
+
+export const registerDevice = async (payload) => {
+  const { data } = await apiClient.post('/v1/devices', payload)
+  return data
+}
+
+export const updateDevice = async (id, payload) => {
+  const { data } = await apiClient.patch(`/v1/devices/${id}`, payload)
+  return data
+}
+
+export const deleteDevice = async (id) => {
+  const { data } = await apiClient.delete(`/v1/devices/${id}`)
+  return data
+}
+
 // Inventory API
 export const listInventory = async (params = {}) => {
   const { data } = await apiClient.get('/v1/inventory', { params })

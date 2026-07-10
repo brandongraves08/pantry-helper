@@ -11,6 +11,7 @@ import Reviews from './pages/Reviews';
 import Household from './pages/Household';
 import SettingsPage from './pages/Settings';
 import BarcodeScan from './pages/BarcodeScan';
+import Devices from './pages/Devices';
 
 function Layout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -126,6 +127,7 @@ function App() {
         <Route path="/zones" element={<Zones />} />
         <Route path="/reviews" element={<Reviews />} />
         <Route path="/household" element={<Household />} />
+        <Route path="/devices" element={<Devices />} />
         <Route path="/settings" element={<SettingsPage />} />
       </Routes>
     </Layout>
