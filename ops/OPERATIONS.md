@@ -11,12 +11,13 @@
 
 ## URLs
 
-| Service | URL | Nagios |
-|---------|-----|--------|
-| Web UI | http://pantry-helper.thelab.lan:3000 | ✅ |
-| API | http://pantry-helper.thelab.lan:8000 | ✅ |
-| Flower (Celery) | http://pantry-helper.thelab.lan:5555 | ✅ |
-| API Health | http://pantry-helper.thelab.lan:8000/health | — |
+| Service | URL | Nagios | Notes |
+|---------|-----|--------|-------|
+| Web UI | http://pantry-helper.thelab.lan:3000 | ✅ | React dashboard — devices, inventory, captures |
+| API | http://pantry-helper.thelab.lan:8000 | ✅ | FastAPI backend — docs at /docs |
+| API Health | http://pantry-helper.thelab.lan:8000/health | ✅ | Enhanced: checks DB + Redis + storage, 503 on critical |
+| Flower (Celery) | http://pantry-helper.thelab.lan:5555 | ✅ | Celery task queue monitoring |
+| Grafana | https://grafana.homelab.graveystudios.com | — | Pantry dashboard: `/d/dfrpmw7636328d` |
 
 ## Access
 
@@ -90,17 +91,46 @@ sudo pct exec 202 -- journalctl -u pantry-helper-backup.service --no-pager -n 50
 - **Primary IPv4:** `192.168.2.202/24` assigned to `eth0` virtual interface (ID 11)
 - **Tags:** `lxc`, `docker`
 
-### Nagios
-- **⚠️ NOT YET CONFIGURED** — NCPA agent v2.x is installed and running on the LXC (port 5693, HTTPS)
-- UFW rule added: `192.168.0.0/16` allowed to port 5693/tcp
-- NCPA community_string: stored in LXC `/usr/local/ncpa/etc/ncpa.cfg`
-- Requires adding the Nagios host definition and service checks from `loki.thelab.lan`
+### Nagios (✅ Active — 5 checks)
+
+**Host definition:** `pantry-helper` (192.168.2.202) in `/home/brandon/nagios-core/custom-plugins/pantry_helper.cfg`
+
+| Check | Type | Current Status |
+|-------|------|----------------|
+| Pantry API Health | HTTP (pantry-helper.thelab.lan:8000/health) | ✅ OK |
+| Pantry Web UI | HTTP (pantry-helper.thelab.lan:3000/) | ✅ OK |
+| Pantry Flower Dashboard | HTTP (pantry-helper.thelab.lan:5555/) | ✅ OK |
+| NCPA CPU | NCPA agent (LXC 202:5693) | ✅ OK |
+| NCPA Memory | NCPA agent (LXC 202:5693) | ✅ OK |
+
+**Validate config:** `python3 scripts/nagios_validate.py` (runs `nagios -v` in container on loki.thelab.lan)
+
+**Refresh Nagios after config change:**
+```bash
+ssh brandon@loki.thelab.lan "docker exec nagios-core /opt/nagios/bin/nagios -v /opt/nagios/etc/nagios.cfg"
+ssh brandon@loki.thelab.lan "docker exec nagios-core /opt/nagios/bin/nagios -s /opt/nagios/var/rw/nagios.cmd"
+```
 
 ### Loki / Promtail
 - `pantry-promtail` ships all Docker container logs to `loki.thelab.lan:3100`
+- Label: `project="pantry-helper"` — use this in LogQL queries
+- Container names in `attrs_tag` stream (e.g., `pantry-api`, `pantry-web`)
 - All containers emit structured JSON logs to stdout/stderr
 - Nginx uses JSON format with upstream response info
 - API middleware logs request IDs, timing, and status for every request
+
+**Loki Alert Rules (3 active):**
+| Rule | Condition | Severity |
+|------|-----------|----------|
+| PantryHelperHighErrorRate | >10 error/fatal/critical lines in 5min | warning → Discord |
+| PantryHelperCriticalErrors | Any fatal/critical/panic line | critical → Discord |
+| PantryHelperNoRecentLogs | Zero log activity for 10min | critical → Discord |
+
+Rules location: `/loki/rules/fake/pantry-helper-alerts.yaml` inside Loki container.
+
+**Grafana Dashboard:**
+- URL: `/d/dfrpmw7636328d/pantry-helper-logs-and-health`
+- Panels: log volume, error events, per-source breakdown, recent logs
 
 ### Docker Healthchecks
 - All services have `healthcheck` stanzas
@@ -115,6 +145,12 @@ VISION_PROVIDER=openclaw
 OPENCLAW_VISION_URL=http://172.16.1.1:18790/analyze
 OPENCLAW_GATEWAY_TOKEN_FILE=/run/secrets/openclaw_gateway_token
 OPENCLAW_VISION_MODEL=openai/gpt-5.4-mini
+DATABASE_URL=postgresql://pantry:***@db/pantry_db
+REDIS_URL=redis://redis:6379/0
+CELERY_BROKER_URL=redis://redis:6379/0
+IMAGE_RETENTION_DAYS=30
+MAX_STORAGE_MB=5000
+LOG_LEVEL=INFO
 ```
 
 Vision routing:
@@ -124,6 +160,29 @@ Vision routing:
 Docker containers reach OpenClaw image understanding through the user service
 `openclaw-docker-gateway-proxy.service`, which binds only to the Pantry Docker bridge
 `172.16.1.1:18790` and runs `openclaw infer image describe`.
+
+## Docker Images
+
+| Image | Size | Notes |
+|-------|------|-------|
+| pantry-helper-backend | **355MB** | Python 3.12-slim, multi-stage, no ImageMagick |
+| pantry-helper-celery_worker | **355MB** | Same image as backend (different CMD) |
+| pantry-helper-flower | **355MB** | Same image as backend (different CMD) |
+| pantry-helper-web | **93.6MB** | Nginx alpine serving Vite-built React |
+
+**Build optimization:** `--no-install-recommends` avoids ImageMagick (~100MB+ savings from libzbar0 Recommends).
+Test deps (pytest, httpx) split into `requirements-dev.txt` — not in production images.
+
+**Full rebuild (all services):**
+```bash
+ssh openclaw@192.168.2.202 "cd /home/brandon/pantry-helper && docker compose build --no-cache && docker compose up -d"
+```
+
+**Single service rebuild:**
+```bash
+ssh openclaw@192.168.2.202 "cd /home/brandon/pantry-helper && docker compose up -d --build <service>"
+# Services: backend (API), celery_worker, web, flower
+```
 
 ## Logs
 
@@ -148,8 +207,31 @@ Unprivileged LXC prevents direct NFS mount. Need a Proxmox host-side bind mount 
 3. SSH into LXC as `openclaw` and rebuild: `cd /home/brandon/pantry-helper && docker compose up -d --build`
 4. Verify: `curl -fsS http://localhost:8000/health && curl -fsS -o /dev/null -w "%{http_code}" http://localhost:3000`
 
+## API Endpoints (Key Routes)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/health` | Health check (DB, Redis, storage; HTTP 503 on critical) |
+| GET | `/docs` | Swagger API docs |
+| GET | `/v1/inventory` | List current inventory |
+| POST | `/v1/inventory/override` | Manually set item count (with location/expiry) |
+| GET | `/v1/inventory/export/csv` | Download inventory as CSV |
+| GET | `/v1/inventory/history` | Inventory change history (query: `?days=7`) |
+| GET | `/v1/devices` | List registered devices |
+| POST | `/v1/devices` | Register new device (returns token) |
+| GET | `/v1/devices/{id}/health` | Device health metrics (battery, captures, success%) |
+| DELETE | `/v1/devices/{id}` | Remove device |
+| POST | `/v1/captures/manual` | Upload image manually (multipart form) |
+| POST | `/v1/ingest` | ESP32 image ingest (token auth) |
+| GET | `/v1/reviews` | Pending review queue (detections needing approval) |
+| GET | `/v1/zones` | List storage zones/locations |
+| GET | `/v1/household/members` | List household members |
+| POST | `/admin/storage/cleanup` | Trigger image retention cleanup (`?days=30`) |
+
+Full API reference: http://pantry-helper.thelab.lan:8000/docs
+
 ## OpenClaw Integration
 
 - **OpenClaw Project Plan:** `~/.openclaw/workspace/projects/pantry-helper/plan.json`
 - **Check-in cron:** Weekly (Monday 5pm CT) — `checkin:pantry-helper`
-- **Vision routing:** Currently configured as `VISION_PROVIDER=nvidia` on the LXC (NVIDIA NIM). Local dev config uses `openclaw`
+- **Vision routing:** Currently configured as `VISION_PROVIDER=openclaw` on the LXC (OpenClaw gateway). Provider can be switched to `nvidia` (NVIDIA NIM) or `openai` via `.env`
