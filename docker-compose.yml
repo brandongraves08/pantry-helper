@@ -48,6 +48,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      target: runtime
     container_name: pantry-api
     restart: always
     environment:
@@ -94,6 +95,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      target: runtime
     container_name: pantry-worker
     restart: always
     environment:
@@ -136,6 +138,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      target: runtime
     container_name: pantry-flower
     restart: always
     environment:
