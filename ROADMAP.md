@@ -36,7 +36,7 @@
 - [x] Verified Nagios has 5 active checks for pantry-helper (API, Web, Flower, NCPA CPU, NCPA Memory)
 - [x] Created Grafana/Loki dashboard: log volume, error events, recent logs, per-source breakdown
 - [x] Dashboard imported at `/d/dfrpmw7636328d/pantry-helper-logs-and-health`
-- [ ] Pending: Loki alert rules (need to deploy to Loki volume on loki.thelab.lan)
+- [x] Deployed Loki alert rules (3 rules: high error rate, critical errors, no recent logs)
 
 ### Phase 5: ESP32 Hardware Onboarding
 - [ ] Test device registration flow with real or simulated ESP32
