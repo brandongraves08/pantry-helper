@@ -49,7 +49,7 @@
 ## 📋 Medium Priority
 
 - **Confidence tuning** — Fine-tune vision prompts & thresholds per category
-- **Device management UI** — Health metrics, settings, de-registration
+- **Device management UI** ✅ *(2026-07-10)* — Devices page at `/devices` with list, health details, register, delete
 - **Mobile responsiveness** — Current: partially responsive
 - **User auth** — Login/logout, user roles (if needed beyond single-family)
 - **Expiry tracking via OCR** — Parse expiry dates from labels
