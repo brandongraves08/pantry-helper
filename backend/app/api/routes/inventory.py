@@ -1,7 +1,10 @@
 from datetime import datetime
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
+import os
+
 from app.db.database import get_db
 from app.db.models import InventoryState, InventoryItem, Location, ShoppingListItem as ShoppingListItemModel, InventoryReview
 from app.models.schemas import (
@@ -14,6 +17,7 @@ from app.models.schemas import (
     ReviewResponse,
 )
 from app.services.inventory import InventoryManager
+from app.services.storage import get_storage_manager
 
 router = APIRouter()
 
@@ -25,6 +29,7 @@ async def get_inventory(db: Session = Depends(get_db)):
     
     items = [
         InventoryItemSchema(
+            item_id=state.item.id,
             canonical_name=state.item.canonical_name,
             brand=state.item.brand,
             package_type=state.item.package_type,
@@ -39,6 +44,7 @@ async def get_inventory(db: Session = Depends(get_db)):
             par_level=getattr(state, "par_level", None),
             is_manual=state.is_manual,
             notes=state.notes,
+            image_url=f"/v1/inventory/{state.item.id}/image" if state.item.image_path else None,
         )
         for state in states
         if state.confidence > 0  # Filter out stale items
@@ -100,6 +106,24 @@ async def override_inventory(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/inventory/{item_id}/image")
+async def get_inventory_item_image(item_id: str, db: Session = Depends(get_db)):
+    """Serve the image for an inventory item."""
+    item = db.query(InventoryItem).filter(InventoryItem.id == item_id).first()
+    if not item or not item.image_path:
+        raise HTTPException(status_code=404, detail="Image not found")
+    
+    image_path = item.image_path
+    if not os.path.isabs(image_path):
+        storage_mgr = get_storage_manager()
+        image_path = str(storage_mgr.storage_path / image_path)
+    
+    if not os.path.exists(image_path):
+        raise HTTPException(status_code=404, detail="Image file missing")
+    
+    return FileResponse(image_path, media_type="image/jpeg")
+
 
 @router.get("/inventory/history")
 async def get_inventory_history(

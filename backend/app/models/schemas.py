@@ -31,6 +31,7 @@ class CaptureDetail(BaseModel):
 
 class InventoryItem(BaseModel):
     """Inventory item representation"""
+    item_id: Optional[str] = None
     canonical_name: str
     brand: Optional[str] = None
     package_type: Optional[str] = None
@@ -46,6 +47,8 @@ class InventoryItem(BaseModel):
     expires_at: Optional[datetime] = None
     opened_at: Optional[datetime] = None
     par_level: Optional[int] = None
+
+    image_url: Optional[str] = None
 
     is_manual: bool = False
     notes: Optional[str] = None
@@ -104,6 +107,68 @@ class ReviewResponse(BaseModel):
     notes: Optional[str] = None
     created_at: datetime
     resolved_at: Optional[datetime] = None
+
+# Barcode Schemas
+
+class BarcodeLookupRequest(BaseModel):
+    """Request to look up a barcode."""
+    barcode: str
+
+
+class BarcodeLookupNutrition(BaseModel):
+    energy_kcal: Optional[float] = None
+    protein_g: Optional[float] = None
+    carbs_g: Optional[float] = None
+    fat_g: Optional[float] = None
+    fiber_g: Optional[float] = None
+    sodium_g: Optional[float] = None
+    sugars_g: Optional[float] = None
+
+
+class BarcodeLookupResult(BaseModel):
+    """Result of a barcode lookup."""
+    barcode: str
+    found: bool = False
+    product_name: Optional[str] = None
+    brand: Optional[str] = None
+    category: Optional[str] = None
+    package_type: Optional[str] = None
+    image_url: Optional[str] = None
+    quantity: Optional[str] = None
+    serving_size: Optional[str] = None
+    nutrition: Optional[BarcodeLookupNutrition] = None
+    allergens: list[str] = []
+    ingredients_text: Optional[str] = None
+    already_in_inventory: bool = False
+    existing_item_name: Optional[str] = None
+    source: str = "openfoodfacts"
+
+
+class BarcodeLinkRequest(BaseModel):
+    """Link a barcode to an inventory item."""
+    barcode: str
+    inventory_item_name: str
+
+
+class BarcodeLinkResponse(BaseModel):
+    """Response after linking barcode to an item."""
+    success: bool
+    barcode: str
+    inventory_item_name: str
+    message: str
+
+
+class BarcodeAddToInventoryRequest(BaseModel):
+    """Add a barcode-scanned product directly to inventory."""
+    barcode: str
+    product_name: str
+    brand: Optional[str] = None
+    category: Optional[str] = None
+    package_type: Optional[str] = None
+    quantity_estimate: int = 1
+    par_level: Optional[int] = None
+    expires_at: Optional[datetime] = None
+
 
 # Device Management Schemas
 

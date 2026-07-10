@@ -67,6 +67,7 @@ class InventoryItem(Base):
     package_type = Column(String, nullable=True)
     category = Column(String, nullable=True)
     unit = Column(String, nullable=True)
+    image_path = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     states = relationship("InventoryState", back_populates="item")
@@ -285,3 +286,28 @@ class ConsumptionEvent(Base):
 InventoryItem.nutrition_facts = relationship("NutritionFact", back_populates="item", uselist=False)
 InventoryItem.allergens = relationship("ItemAllergen", back_populates="item")
 InventoryItem.consumption_events = relationship("ConsumptionEvent", back_populates="item")
+
+
+class BarcodeLookup(Base):
+    """Barcode-to-inventory-item mapping cache."""
+    __tablename__ = "barcode_lookups"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    barcode = Column(String, nullable=False, unique=True, index=True)
+    inventory_item_id = Column(String, ForeignKey("inventory_items.id"), nullable=True)
+    product_name = Column(String, nullable=True)
+    brand = Column(String, nullable=True)
+    category = Column(String, nullable=True)
+    package_type = Column(String, nullable=True)
+    image_url = Column(String, nullable=True)
+    quantity_label = Column(String, nullable=True)
+    serving_size = Column(String, nullable=True)
+    nutrition_json = Column(JSON, nullable=True)
+    allergens_json = Column(JSON, nullable=True)
+    ingredients_text = Column(Text, nullable=True)
+    source = Column(String, nullable=True)  # openfoodfacts, manual
+    lookup_count = Column(Integer, nullable=False, default=1)
+    last_lookup_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    inventory_item = relationship("InventoryItem", backref="barcodes")
