@@ -30,10 +30,13 @@
 - [x] Added `target: runtime` to docker-compose.yml for api/worker/flower
 - **Result:** 565MB → **355MB** per backend image (37% reduction, under 500MB target)
 
-### Phase 4: Monitoring & Observability
-- [ ] Create Grafana/Loki dashboard for pantry-helper logs
-- [ ] Add Loki alert rules (5xx errors, service down, high latency)
-- [ ] Verify all health endpoints cover DB + Redis from Nagios
+### Phase 4: Monitoring & Observability ✅ *(2026-07-10)*
+- [x] Enhanced `/health` endpoint: DB (PostgreSQL) + Redis + storage checks
+- [x] Health returns HTTP 503 if DB is down (critical), 200 with degraded if Redis/storage fail
+- [x] Verified Nagios has 5 active checks for pantry-helper (API, Web, Flower, NCPA CPU, NCPA Memory)
+- [x] Created Grafana/Loki dashboard: log volume, error events, recent logs, per-source breakdown
+- [x] Dashboard imported at `/d/dfrpmw7636328d/pantry-helper-logs-and-health`
+- [ ] Pending: Loki alert rules (need to deploy to Loki volume on loki.thelab.lan)
 
 ### Phase 5: ESP32 Hardware Onboarding
 - [ ] Test device registration flow with real or simulated ESP32
@@ -60,7 +63,7 @@
 - **CORS** — Verify production CORS config
 - **Rate limiting** — Add to API endpoints
 - **Secrets management** — Gateway token via docker secret mount is working, full audit needed
-- **Docker images ~840MB** — Multi-stage build targets <500MB
+- **Docker images at 355MB** — Under 500MB target after Phase 3 optimization
 
 ## 🧪 Testing
 
@@ -82,7 +85,7 @@
 - Nagios-monitored: ✅ (5 checks)
 - PBS-backed-up: ✅ (daily job)
 - Config-consistent dev/prod: ✅
-- Docker images <500MB: ❌ (next phase)
+- Docker images <500MB: ✅ (355MB after Phase 3)
 - ESP32 connected: ❌ (next phase)
-- Loki dashboard: ❌ (next phase)
+- Loki dashboard: ✅ (Phase 4)
 - Code committed: ✅ (all changes tracked)

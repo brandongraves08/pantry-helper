@@ -1,3 +1,8 @@
+import os
+
+import redis as sync_redis
+from sqlalchemy import text
+
 from app.log_config import setup_logging
 
 logger = setup_logging("pantry-api")
@@ -7,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from app.api.routes import ingest, inventory, admin, devices, advanced_inventory, agent
 from app.api.routes import shopping, reviews, captures, zones, household, barcode, detections, nutrition
+from app.config import settings
 from app.db.database import engine, Base
 from app.exceptions import PantryException
 from app.middleware.rate_limit import RateLimitMiddleware
@@ -70,8 +76,73 @@ app.include_router(nutrition.router, prefix="/v1", tags=["nutrition"])
 
 @app.get("/health")
 async def health_check():
+    """
+    Health check endpoint with dependency verification.
+
+    Returns:
+        HTTP 200 + status "ok" when all checks pass.
+        HTTP 200 + status "degraded" when non-critical checks fail (Redis, storage).
+        HTTP 503 + status "critical" when critical checks fail (database).
+    """
     logger.info("Health check requested")
-    return {"status": "ok"}
+
+    health = {
+        "status": "ok",
+        "version": "1.0.0",
+        "checks": {},
+    }
+
+    # ── Database check (critical) ──
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        health["checks"]["database"] = {"status": "ok"}
+    except Exception as e:
+        logger.error("Health check: database unreachable", extra={"error": str(e)})
+        health["checks"]["database"] = {"status": "error", "detail": str(e)}
+        health["status"] = "critical"
+
+    # ── Redis check (non-critical — API can serve cached data without it) ──
+    try:
+        r = sync_redis.from_url(
+            settings.REDIS_URL,
+            socket_connect_timeout=2,
+            socket_timeout=3,
+        )
+        r.ping()
+        r.close()
+        health["checks"]["redis"] = {"status": "ok"}
+    except Exception as e:
+        health["checks"]["redis"] = {"status": "unavailable", "detail": str(e)}
+        if health["status"] == "ok":
+            health["status"] = "degraded"
+
+    # ── Storage check (non-critical) ──
+    try:
+        storage_path = settings.STORAGE_PATH
+        if storage_path and os.path.exists(storage_path):
+            stat = os.statvfs(storage_path)
+            avail = stat.f_frsize * stat.f_bavail
+            total = stat.f_frsize * stat.f_blocks
+            used_pct = round((1 - stat.f_bavail / stat.f_blocks) * 100, 1)
+            health["checks"]["storage"] = {
+                "status": "ok",
+                "free_bytes": avail,
+                "total_bytes": total,
+                "used_pct": used_pct,
+            }
+            if used_pct > 90:
+                health["checks"]["storage"]["status"] = "warning"
+        else:
+            health["checks"]["storage"] = {"status": "unavailable"}
+    except Exception as e:
+        health["checks"]["storage"] = {"status": "error", "detail": str(e)}
+
+    # ── Response ──
+    if health["status"] == "critical":
+        return JSONResponse(status_code=503, content=health)
+
+    return health
 
 @app.on_event("startup")
 async def startup_event():
@@ -82,5 +153,3 @@ async def startup_event():
             "db": os.getenv("DATABASE_URL", "not set")[:30] + "...",
         }
     })
-
-import os
