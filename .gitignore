@@ -43,6 +43,7 @@ venv.bak/
 *~
 .DS_Store
 .env
+.env.docker
 .env.local
 .env.*.local
 .env.tmp
