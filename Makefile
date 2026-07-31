@@ -1,0 +1,143 @@
+.PHONY: help backend-install backend-run backend-test backend-migrate firmware-build firmware-upload web-install web-dev clean
+
+# Use a project-local virtualenv for Python deps (avoids PEP 668 / system Python issues)
+# Prefer python3.12 because some deps (e.g., psycopg2-binary) may not ship wheels for 3.14 yet.
+PYTHON ?= python3.12
+VENV := backend/venv
+PY := $(VENV)/bin/python
+PIP := $(VENV)/bin/pip
+
+help:
+	@echo "Pantry Inventory - Available targets:"
+	@echo ""
+	@echo "🐳 Docker (Recommended):"
+	@echo "  make docker-up           Start all services with Docker"
+	@echo "  make docker-down         Stop all services"
+	@echo "  make docker-logs         View service logs"
+	@echo "  make docker-seed         Create test devices"
+	@echo "  make docker-test         Run tests in Docker"
+	@echo "  make docker-clean        Full cleanup (removes data)"
+	@echo ""
+	@echo "Backend:"
+	@echo "  make backend-install     Install backend dependencies"
+	@echo "  make backend-run         Run backend API server"
+	@echo "  make backend-test        Run backend tests"
+	@echo "  make backend-migrate     Run database migrations"
+	@echo "  make backend-seed        Seed test devices and data"
+	@echo ""
+	@echo "Firmware:"
+	@echo "  make firmware-build      Build ESP32 firmware"
+	@echo "  make firmware-upload     Upload firmware to device"
+	@echo ""
+	@echo "Web UI:"
+	@echo "  make web-install         Install web dependencies"
+	@echo "  make web-dev             Run web dev server"
+	@echo "  make web-build           Build web for production"
+	@echo ""
+	@echo "General:"
+	@echo "  make clean               Clean build artifacts"
+	@echo "  make all                 Install all dependencies"
+
+# Backend targets
+backend-install:
+	@test -x $(PY) || $(PYTHON) -m venv $(VENV)
+	$(PIP) install -r backend/requirements.txt
+
+backend-run: backend-install
+	cd backend && ../$(PY) -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+backend-test: backend-install
+	cd backend && ../$(PY) -m pytest tests/ -v
+
+backend-migrate: backend-install
+	cd backend && ../$(PY) -m alembic upgrade head
+
+backend-migrate-down: backend-install
+	cd backend && ../$(PY) -m alembic downgrade -1
+
+backend-seed: backend-install
+	cd backend && ../$(PY) scripts/seed_db.py seed
+
+# Firmware targets
+firmware-build:
+	cd firmware && pio run -e esp32-cam
+
+firmware-upload:
+	cd firmware && pio run -e esp32-cam -t upload
+
+firmware-monitor:
+	cd firmware && pio device monitor -e esp32-cam
+
+# Web UI targets
+web-install:
+	cd web && npm install
+
+web-dev:
+	cd web && npm run dev
+
+web-build:
+	cd web && npm run build
+
+web-preview:
+	cd web && npm run preview
+
+# Docker targets
+docker-up:
+	docker-compose up -d
+
+docker-down:
+	docker-compose down
+
+docker-build:
+	docker-compose build
+
+docker-logs:
+	docker-compose logs -f
+
+docker-ps:
+	docker-compose ps
+
+docker-clean:
+	docker-compose down -v
+
+docker-seed:
+	docker-compose exec backend python scripts/seed_db.py seed
+
+docker-test:
+	docker-compose exec backend pytest tests/ -v
+
+# Cleanup
+clean:
+	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+	find . -type f -name "*.pyc" -delete
+	cd backend && rm -rf .pytest_cache dist build *.egg-info || true
+	cd firmware && rm -rf .pio build || true
+	cd web && rm -rf node_modules dist .next || true
+
+install: backend-install web-install
+
+run: backend-run
+
+dev:
+	@echo "Starting all services..."
+	@echo "Backend will start on http://localhost:8000"
+	@echo "Web UI will start on http://localhost:5173"
+	@echo "API docs available at http://localhost:8000/docs"
+	make backend-run
+
+build: firmware-build web-build
+
+all: backend-install web-install
+	@echo "All dependencies installed!"
+	@echo ""
+	@echo "Next steps:"
+	@echo "1. Configure backend/.env with database and OpenAI API key"
+	@echo "2. Run 'make backend-seed' to create test devices"
+	@echo "3. Run 'make backend-run' to start the API server"
+	@echo "4. Run 'make web-dev' to start the web UI"
+	@echo ""
+	@echo "Or use Docker:"
+	@echo "1. Copy .env.docker.example to .env"
+	@echo "2. Configure your vision API key in .env"
+	@echo "3. Run 'make docker-up' to start all services"
+	@echo "4. Run 'make docker-seed' to create test devices"

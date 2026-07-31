@@ -1,0 +1,112 @@
+#include "webserver.h"
+#include <WiFi.h>
+#include <WiFiClient.h>
+#include <ArduinoJson.h>
+#include "../config/config.h"
+#include "../power/power.h"
+
+#include <WebServer.h>
+
+::WebServer httpServer(80);
+std::vector<String> WebServer::logs;
+
+void WebServer::init() {
+    httpServer.on("/", [](){
+        String html = "<!DOCTYPE html><html><head>";
+        html += "<title>ESP32-CAM Pantry</title>";
+        html += "<meta name='viewport' content='width=device-width, initial-scale=1'>";
+        html += "<style>body{font-family:Arial;margin:20px;background:#f0f0f0}";
+        html += ".container{max-width:800px;margin:0 auto;background:white;padding:20px;border-radius:10px}";
+        html += "h1{color:#333}.status{padding:10px;margin:10px 0;border-radius:5px}";
+        html += ".online{background:#d4edda;color:#155724}";
+        html += "pre{background:#f8f9fa;padding:10px;border-radius:5px;overflow-x:auto}";
+        html += ".btn{background:#007bff;color:white;padding:10px 20px;border:none;border-radius:5px;cursor:pointer;margin:5px}";
+        html += ".btn:hover{background:#0056b3}#logs{max-height:400px;overflow-y:auto}</style>";
+        html += "<script>function refreshStatus(){fetch('/api/status').then(r=>r.json())";
+        html += ".then(data=>{document.getElementById('status').innerHTML=JSON.stringify(data,null,2)});";
+        html += "fetch('/api/logs').then(r=>r.json())";
+        html += ".then(data=>{document.getElementById('logs').innerHTML=data.logs.map(l=>'<div>'+l+'</div>').join('')})}";
+        html += "setInterval(refreshStatus,2000);window.onload=refreshStatus;</script></head><body>";
+        html += "<div class='container'><h1>ESP32-CAM Pantry Helper</h1>";
+        html += "<div class='status online'>Device Online</div>";
+        html += "<h2>Status</h2><pre id='status'>Loading...</pre>";
+        html += "<h2>Recent Logs</h2><div id='logs' style='background:#f8f9fa;padding:10px;border-radius:5px'>Loading...</div>";
+        html += "<h2>Actions</h2>";
+        html += "<button class='btn' onclick=\"fetch('/api/capture').then(()=>alert('Capture triggered'))\">Trigger Capture</button>";
+        html += "<button class='btn' onclick=\"fetch('/api/restart').then(()=>alert('Restarting'))\">Restart</button>";
+        html += "</div></body></html>";
+        httpServer.send(200, "text/html", html);
+    });
+
+    // API endpoints
+    httpServer.on("/api/status", [](){
+        httpServer.send(200, "application/json", get_status_json());
+    });
+
+    httpServer.on("/api/logs", [](){
+        JsonDocument doc;
+        JsonArray logsArray = doc["logs"].to<JsonArray>();
+        for (const auto& log : logs) {
+            logsArray.add(log);
+        }
+        String response;
+        serializeJson(doc, response);
+        httpServer.send(200, "application/json", response);
+    });
+
+    httpServer.on("/api/capture", [](){
+        add_log("[API] Manual capture triggered");
+        httpServer.send(200, "application/json", "{\"status\":\"triggered\"}");
+    });
+
+    httpServer.on("/api/restart", [](){
+        add_log("[API] Restart requested");
+        httpServer.send(200, "application/json", "{\"status\":\"restarting\"}");
+        delay(100);
+        ESP.restart();
+    });
+
+    httpServer.begin();
+    add_log("[WEB] Server started on port 80");
+}
+
+void WebServer::handle() {
+    httpServer.handleClient();
+}
+
+void WebServer::add_log(const String& message) {
+    String timestamp = String(millis() / 1000) + "s";
+    logs.push_back("[" + timestamp + "] " + message);
+    
+    // Keep only last MAX_LOGS entries
+    if (logs.size() > MAX_LOGS) {
+        logs.erase(logs.begin());
+    }
+    
+    Serial.println(message);
+    Serial2.println(message);
+}
+
+String WebServer::get_status_json() {
+    JsonDocument doc;
+    
+    doc["device_id"] = Config::device_id;
+    doc["uptime_seconds"] = millis() / 1000;
+    doc["wifi"]["ssid"] = WiFi.SSID();
+    doc["wifi"]["ip"] = WiFi.localIP().toString();
+    doc["wifi"]["rssi"] = WiFi.RSSI();
+    doc["wifi"]["mac"] = WiFi.macAddress();
+    
+    doc["battery"]["voltage"] = Battery::read_voltage();
+    doc["battery"]["percentage"] = Battery::read_percentage();
+    
+    doc["memory"]["free_heap"] = ESP.getFreeHeap();
+    doc["memory"]["heap_size"] = ESP.getHeapSize();
+    
+    doc["firmware"]["version"] = "1.0.0";
+    doc["firmware"]["build_date"] = __DATE__ " " __TIME__;
+    
+    String response;
+    serializeJson(doc, response);
+    return response;
+}

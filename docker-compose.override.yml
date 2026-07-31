@@ -1,0 +1,31 @@
+# Production overrides for pantry-helper stack.
+# Applied automatically when no -f flag is given (merges with docker-compose.yml).
+# Apply explicitly: docker compose -f docker-compose.yml -f docker-compose.override.yml up -d
+
+services:
+  db:
+    mem_limit: 2048m
+    cpus: 2.0
+
+  redis:
+    mem_limit: 256m
+    cpus: 0.5
+
+  backend:
+    command: >
+      gunicorn app.main:app
+      -k uvicorn.workers.UvicornWorker
+      -b 0.0.0.0:8000
+      --workers 2
+      --timeout 120
+      --access-logfile -
+      --error-logfile -
+    environment:
+      DEBUG: "false"
+    mem_limit: 1024m
+    cpus: 1.0
+
+  celery_worker:
+    command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=2
+    mem_limit: 1024m
+    cpus: 1.0

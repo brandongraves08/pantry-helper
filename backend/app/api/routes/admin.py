@@ -1,0 +1,391 @@
+"""Admin control endpoints for manual processing and system monitoring."""
+
+from fastapi import APIRouter, HTTPException, Query, Depends
+from sqlalchemy.orm import Session
+from app.db.database import get_db
+from app.db.models import (
+    Capture,
+    Device,
+    Observation,
+    InventoryEvent,
+)
+
+# Capture.status values (see app.db.models.Capture)
+STATUS_STORED = "stored"
+STATUS_ANALYZING = "analyzing"
+STATUS_COMPLETE = "complete"
+STATUS_FAILED = "failed"
+from app.workers.celery_app import (
+    process_image_capture,
+    process_pending_captures,
+    celery_app,
+)
+from app.middleware.rate_limit import rate_limit_store
+import logging
+from typing import Optional
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter()
+
+
+
+@router.get("/admin/stats")
+async def get_system_stats(db: Session = Depends(get_db)):
+    """Get system statistics and job queue status."""
+    # Database stats
+    device_count = db.query(Device).count()
+    capture_count = db.query(Capture).count()
+    observation_count = db.query(Observation).count()
+    event_count = db.query(InventoryEvent).count()
+
+    # Capture status breakdown
+    pending = db.query(Capture).filter(Capture.status == STATUS_STORED).count()
+    processing = db.query(Capture).filter(Capture.status == STATUS_ANALYZING).count()
+    completed = db.query(Capture).filter(Capture.status == STATUS_COMPLETE).count()
+    failed = db.query(Capture).filter(Capture.status == STATUS_FAILED).count()
+
+    # Get active tasks from Celery (optional; tests/dev may not have Redis running)
+    total_active = 0
+    total_reserved = 0
+    try:
+        inspect = celery_app.control.inspect()
+        active_tasks = inspect.active() or {}
+        reserved_tasks = inspect.reserved() or {}
+        total_active = sum(len(tasks) for tasks in active_tasks.values())
+        total_reserved = sum(len(tasks) for tasks in reserved_tasks.values())
+    except Exception as e:
+        logger.warning(f"Celery inspect unavailable (broker down?): {e}")
+
+    return {
+        "devices": {"total": device_count},
+        "captures": {
+            "total": capture_count,
+            "pending": pending,
+            "processing": processing,
+            "completed": completed,
+            "failed": failed,
+        },
+        "observations": {"total": observation_count},
+        "events": {"total": event_count},
+        "queue": {
+            "active_jobs": total_active,
+            "reserved_jobs": total_reserved,
+            "total_queued": total_active + total_reserved,
+        },
+        "rate_limits": {
+            "enabled": True,
+            "total_tracked": len(rate_limit_store.requests),
+        },
+    }
+
+
+@router.post("/admin/process-capture/{capture_id}")
+async def process_capture(
+    capture_id: str,
+    sync: bool = Query(False),
+    db: Session = Depends(get_db),
+):
+    """
+    Process a single image capture.
+    
+    Args:
+        capture_id: ID of capture to process
+        sync: If True, wait for result; if False, queue asynchronously (default)
+    """
+    capture = db.query(Capture).filter(Capture.id == capture_id).first()
+    if not capture:
+        raise HTTPException(status_code=404, detail="Capture not found")
+
+    if sync:
+        # Process synchronously
+        try:
+            from app.services.vision import VisionAnalyzer
+
+            analyzer = VisionAnalyzer()
+            result = analyzer.analyze_image(capture.image_path)
+
+            # Create observation
+            observation = Observation(
+                capture_id=capture.id,
+                raw_json=result.model_dump() if hasattr(result, "model_dump") else result,
+                scene_confidence=getattr(result, "scene_confidence", None),
+            )
+            db.add(observation)
+            capture.status = STATUS_COMPLETE
+            db.commit()
+
+            return {
+                "capture_id": capture_id,
+                "observation_id": observation.id,
+                "status": "completed",
+                "sync": True,
+            }
+        except Exception as e:
+            capture.status = STATUS_FAILED
+            db.commit()
+            logger.error(f"Sync processing failed: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+    else:
+        # Queue async job
+        task = process_image_capture.delay(capture_id)
+        return {
+            "capture_id": capture_id,
+            "task_id": task.id,
+            "status": "queued",
+            "sync": False,
+        }
+
+
+@router.post("/admin/process-pending")
+async def process_pending(
+    sync: bool = Query(False),
+    limit: int = Query(100, ge=1, le=1000),
+    db: Session = Depends(get_db),
+):
+    """
+    Process all pending captures.
+    
+    Args:
+        sync: If True, process synchronously; if False, queue batch job
+    """
+    pending = (
+        db.query(Capture)
+        .filter(Capture.status == STATUS_STORED)
+        .limit(limit)
+        .all()
+    )
+
+    if not pending:
+        return {
+            "success": True,
+            "message": "No pending captures",
+            "processed": 0,
+            "sync": sync,
+        }
+
+    if sync:
+        # Process synchronously
+        processed = 0
+        try:
+            from app.services.vision import VisionAnalyzer
+
+            analyzer = VisionAnalyzer()
+            for capture in pending:
+                try:
+                    result = analyzer.analyze_image(capture.image_path)
+                    observation = Observation(
+                        capture_id=capture.id,
+                        raw_json=result.model_dump() if hasattr(result, "model_dump") else result,
+                        scene_confidence=getattr(result, "scene_confidence", None),
+                    )
+                    db.add(observation)
+                    capture.status = STATUS_COMPLETE
+                    processed += 1
+                except Exception as e:
+                    logger.error(f"Failed to process {capture.id}: {e}")
+                    capture.status = STATUS_FAILED
+
+            db.commit()
+            return {
+                "message": "Batch processing completed",
+                "processed": processed,
+                "sync": True,
+            }
+        except Exception as e:
+            logger.error(f"Batch processing failed: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+    else:
+        # Queue batch job
+        task = process_pending_captures.delay()
+        return {
+            "task_id": task.id,
+            "message": "Batch processing queued",
+            "pending_count": len(pending),
+            "sync": False,
+        }
+
+
+@router.get("/admin/task-status/{task_id}")
+async def get_task_status(task_id: str):
+    """Get status of a queued processing task."""
+    from celery.result import AsyncResult
+
+    task = AsyncResult(task_id, app=celery_app)
+    
+    return {
+        "task_id": task_id,
+        "state": task.state,
+        "result": task.result if task.ready() else None,
+        "ready": task.ready(),
+        "successful": task.successful() if task.ready() else None,
+        "failed": task.failed() if task.ready() else None,
+    }
+
+
+@router.post("/admin/cancel-task/{task_id}")
+async def cancel_task(task_id: str):
+    """Cancel a running or queued task."""
+    celery_app.control.revoke(task_id, terminate=True)
+    
+    return {
+        "task_id": task_id,
+        "status": "cancelled",
+    }
+
+
+@router.get("/admin/queue-info")
+async def get_queue_info():
+    """Get detailed information about the job queue."""
+    try:
+        inspect = celery_app.control.inspect()
+        
+        active = inspect.active() or {}
+        reserved = inspect.reserved() or {}
+        stats = inspect.stats() or {}
+
+        return {
+            "active": {
+                "tasks": sum(len(tasks) for tasks in active.values()),
+                "by_worker": {w: len(tasks) for w, tasks in active.items()},
+            },
+            "reserved": {
+                "tasks": sum(len(tasks) for tasks in reserved.values()),
+                "by_worker": {w: len(tasks) for w, tasks in reserved.items()},
+            },
+            "workers": list(stats.keys()),
+            "pool_size": len(stats),
+        }
+    except Exception as e:
+        logger.error(f"Error getting stats: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/admin/storage/stats")
+async def get_storage_stats():
+    """Get storage statistics and usage information."""
+    logger.info("Getting storage statistics...")
+    
+    try:
+        from app.services.storage import get_storage_manager
+        storage_mgr = get_storage_manager()
+        stats = storage_mgr.get_storage_stats()
+        
+        return {
+            "status": "ok",
+            "storage": stats,
+        }
+    except Exception as e:
+        logger.error(f"Error getting storage stats: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/admin/storage/cleanup")
+async def cleanup_storage(
+    days: int = Query(30, ge=1, le=365),
+    dry_run: bool = Query(False),
+):
+    """
+    Enforce image retention policy and cleanup old images.
+    
+    Parameters:
+    - days: Keep images newer than this many days
+    - dry_run: If True, only report what would be deleted (not implemented in v1)
+    """
+    logger.info(f"Cleanup storage requested (days={days})")
+    
+    try:
+        from app.workers.retention import get_retention_enforcer
+        enforcer = get_retention_enforcer()
+        
+        # Override retention if specified
+        original_retention = enforcer.retention_days
+        enforcer.retention_days = days
+        
+        result = enforcer.enforce_retention()
+        
+        # Restore original retention
+        enforcer.retention_days = original_retention
+        
+        return {
+            "status": "success" if result["success"] else "error",
+            "result": result,
+        }
+    except Exception as e:
+        logger.error(f"Error during cleanup: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/admin/storage/cleanup-failed")
+async def cleanup_failed_captures(
+    days: int = Query(7, ge=1, le=365),
+):
+    """
+    Clean up images from failed captures older than X days.
+    
+    Parameters:
+    - days: Delete failed capture images older than this many days
+    """
+    logger.info(f"Cleanup failed captures requested (days={days})")
+    
+    try:
+        from app.workers.retention import get_retention_enforcer
+        enforcer = get_retention_enforcer()
+        result = enforcer.cleanup_failed_captures(days=days)
+        
+        return {
+            "status": "success" if result["success"] else "error",
+            "result": result,
+        }
+    except Exception as e:
+        logger.error(f"Error during failed cleanup: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/admin/storage/check-quota")
+async def check_storage_quota(
+    max_mb: int = Query(5000, ge=100, le=100000),
+):
+    """
+    Check storage quota and trigger cleanup if needed.
+    
+    Parameters:
+    - max_mb: Maximum storage allowed in MB
+    """
+    logger.info(f"Checking storage quota (limit={max_mb} MB)...")
+    
+    try:
+        from app.workers.retention import get_retention_enforcer
+        enforcer = get_retention_enforcer()
+        result = enforcer.check_storage_quota(max_storage_mb=max_mb)
+        
+        return {
+            "status": "ok",
+            "result": result,
+        }
+    except Exception as e:
+        logger.error(f"Error checking quota: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/admin/storage/cleanup-orphans")
+async def cleanup_orphaned_images():
+    """
+    Delete orphaned images (files without corresponding DB records).
+    
+    This is useful after manual database maintenance or failed uploads.
+    """
+    logger.info("Cleaning orphaned images...")
+    
+    try:
+        from app.services.storage import get_storage_manager
+        storage_mgr = get_storage_manager()
+        deleted = storage_mgr.cleanup_orphaned_images()
+        
+        return {
+            "status": "success",
+            "deleted_count": deleted,
+        }
+    except Exception as e:
+        logger.error(f"Error cleaning orphans: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
