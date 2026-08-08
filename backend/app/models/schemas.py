@@ -171,6 +171,60 @@ class BarcodeAddToInventoryRequest(BaseModel):
     expires_at: Optional[datetime] = None
 
 
+# Recipe Schemas
+
+class RecipeIngredientInput(BaseModel):
+    """An ingredient line in a recipe."""
+    quantity: Optional[str] = None
+    name: str
+    note: Optional[str] = None
+    inventory_item_id: Optional[str] = None
+
+
+class RecipeCreate(BaseModel):
+    """Request to create or update a recipe."""
+    name: str
+    description: Optional[str] = None
+    source: Optional[str] = None
+    servings: Optional[int] = None
+    prep_time_min: Optional[int] = None
+    cook_time_min: Optional[int] = None
+    instructions: Optional[str] = None
+    ingredients: Optional[List[RecipeIngredientInput]] = []
+
+
+class RecipeIngredient(BaseModel):
+    """An ingredient line as returned in a recipe."""
+    id: str
+    position: int
+    quantity: Optional[str] = None
+    name: str
+    note: Optional[str] = None
+    inventory_item_id: Optional[str] = None
+    inventory_item_name: Optional[str] = None
+
+
+class Recipe(BaseModel):
+    """A saved recipe."""
+    id: str
+    name: str
+    description: Optional[str] = None
+    source: Optional[str] = None
+    servings: Optional[int] = None
+    prep_time_min: Optional[int] = None
+    cook_time_min: Optional[int] = None
+    instructions: Optional[str] = None
+    ingredients: List[RecipeIngredient] = []
+    created_at: datetime
+    updated_at: datetime
+
+
+class RecipeListResponse(BaseModel):
+    """List of recipes."""
+    recipes: List[Recipe]
+    total: int
+
+
 # Device Management Schemas
 
 class DeviceCreate(BaseModel):

@@ -201,4 +201,35 @@ export const saveItemNutrition = async (itemId, payload) => {
   return data
 }
 
+// Recipes API
+export const listRecipes = async (search = '') => {
+  const { data } = await apiClient.get('/v1/recipes', { params: { search } })
+  return data
+}
+
+export const getRecipe = async (id) => {
+  const { data } = await apiClient.get(`/v1/recipes/${id}`)
+  return data
+}
+
+export const createRecipe = async (payload) => {
+  const { data } = await apiClient.post('/v1/recipes', payload)
+  return data
+}
+
+export const updateRecipe = async (id, payload) => {
+  const { data } = await apiClient.put(`/v1/recipes/${id}`, payload)
+  return data
+}
+
+export const deleteRecipe = async (id) => {
+  const { data } = await apiClient.delete(`/v1/recipes/${id}`)
+  return data
+}
+
+export const getRecipeShoppingNeeds = async (id) => {
+  const { data } = await apiClient.get(`/v1/recipes/${id}/shopping-needs`)
+  return data
+}
+
 export default apiClient

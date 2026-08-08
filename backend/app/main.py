@@ -11,7 +11,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from app.api.routes import ingest, inventory, admin, devices, advanced_inventory, agent
-from app.api.routes import shopping, reviews, captures, zones, household, barcode, detections, nutrition
+from app.api.routes import shopping, reviews, captures, zones, household, barcode, detections, nutrition, recipes
 from app.config import settings
 from app.db.database import engine, Base
 from app.exceptions import PantryException
@@ -73,6 +73,7 @@ app.include_router(barcode.router, prefix="/v1", tags=["barcode"])
 app.include_router(agent.router, prefix="/v1", tags=["agent"])
 app.include_router(detections.router, prefix="/v1", tags=["detections"])
 app.include_router(nutrition.router, prefix="/v1", tags=["nutrition"])
+app.include_router(recipes.router, prefix="/v1", tags=["recipes"])
 
 @app.get("/health")
 async def health_check():

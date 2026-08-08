@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Routes, Route, NavLink } from 'react-router-dom';
-import { Package, Camera, MapPin, Users, Settings, Home, ShoppingCart, ScanLine, Menu, X } from 'lucide-react';
+import { Package, Camera, MapPin, Users, Settings, Home, ShoppingCart, ScanLine, Menu, X, BookOpen } from 'lucide-react';
 
 // Page components
 import Dashboard from './pages/Dashboard';
@@ -12,6 +12,7 @@ import Household from './pages/Household';
 import SettingsPage from './pages/Settings';
 import BarcodeScan from './pages/BarcodeScan';
 import Devices from './pages/Devices';
+import Recipes from './pages/Recipes';
 
 function Layout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -33,6 +34,7 @@ function Layout({ children }) {
         <NavItem to="/captures" icon={Camera} label="Captures" onClick={closeSidebar} />
         <NavItem to="/zones" icon={MapPin} label="Zones & ML" onClick={closeSidebar} />
         <NavItem to="/reviews" icon={ShoppingCart} label="Review Queue" onClick={closeSidebar} />
+        <NavItem to="/recipes" icon={BookOpen} label="Recipes" onClick={closeSidebar} />
         <NavItem to="/household" icon={Users} label="Household" onClick={closeSidebar} />
         <NavItem to="/settings" icon={Settings} label="Settings" onClick={closeSidebar} />
       </nav>
@@ -126,6 +128,7 @@ function App() {
         <Route path="/captures" element={<Captures />} />
         <Route path="/zones" element={<Zones />} />
         <Route path="/reviews" element={<Reviews />} />
+        <Route path="/recipes" element={<Recipes />} />
         <Route path="/household" element={<Household />} />
         <Route path="/devices" element={<Devices />} />
         <Route path="/settings" element={<SettingsPage />} />

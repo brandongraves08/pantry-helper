@@ -311,3 +311,43 @@ class BarcodeLookup(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     inventory_item = relationship("InventoryItem", backref="barcodes")
+
+
+class Recipe(Base):
+    """A saved recipe with ingredients and instructions."""
+    __tablename__ = "recipes"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    source = Column(String, nullable=True)  # Food Network, Chiles and Smoke, etc
+    servings = Column(Integer, nullable=True)
+    prep_time_min = Column(Integer, nullable=True)
+    cook_time_min = Column(Integer, nullable=True)
+    instructions = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    ingredients = relationship(
+        "RecipeIngredient",
+        back_populates="recipe",
+        cascade="all, delete-orphan",
+        order_by="RecipeIngredient.position",
+    )
+
+
+class RecipeIngredient(Base):
+    """An ingredient line in a recipe, optionally linked to an inventory item."""
+    __tablename__ = "recipe_ingredients"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    recipe_id = Column(String, ForeignKey("recipes.id"), nullable=False)
+    position = Column(Integer, nullable=False, default=0)
+    quantity = Column(String, nullable=True)  # "1½", "½ cup", "2"
+    name = Column(String, nullable=False)  # "ground beef", "dill pickles"
+    note = Column(String, nullable=True)  # "80/20", "cheddar or American"
+    inventory_item_id = Column(String, ForeignKey("inventory_items.id"), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    recipe = relationship("Recipe", back_populates="ingredients")
+    inventory_item = relationship("InventoryItem")
