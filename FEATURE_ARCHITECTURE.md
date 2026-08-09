@@ -71,6 +71,23 @@
 | Expiration Tracking | ✅ | `expires_at`, `opened_at` fields |
 | Shopping List Generation | ✅ | `/v1/shopping` |
 | Manual Override | ⚠️ | Partial - Review queue exists |
+| Product Images | ✅ | OFF backfill + `image_url` in API/UI (2026-08-09) |
+| ⏳ Flag Incorrect Info + Feedback | ⏳ | **PLANNED** - per-item "flag incorrect" button + free-text box so the user can tell the system what's wrong (e.g. wrong product, wrong brand, wrong image, wrong count). System flags item + surfaces the note for correction. |
+
+### 3a. Flag Incorrect Info + Feedback (PLANNED)
+
+**Goal:** Let the user mark any inventory item as incorrect and explain why, so errors (e.g. a mismatched product image auto-fetched from Open Food Facts) can be flagged and corrected.
+
+| Component | Status | Details |
+|-----------|--------|---------|
+| ✅ Flag via API | ⏳ | `POST /v1/inventory/{item_id}/flag` with a `reason` (free-text) and optional `field` (image/brand/count/name) |
+| Flag on Item Row | ⏳ | Button on each inventory row |
+| Free-Text Box | ⏳ | Text box/modal to let the user describe the problem |
+| Flag Visibility | ⏳ | Flagged items highlighted in UI |
+| Review/Clear | ⏳ | Agent or admin reviews flags, fixes the item, clears the flag |
+| Flagged Items Endpoint | ⏳ | `GET /v1/inventory/flags` for the agent to process |
+
+**Trigger/Example:** Image auto-fetch may pull a wrong-brand product. User clicks "Flag" on an item, types "This is Bush's baked beans, not the Korean BBQ one" → system marks it flagged, Hermes picks it up and fixes the image/data.
 
 ### 4. Review Queue
 
@@ -161,22 +178,23 @@ metrics = ["response_time", "items_detected", "accuracy_score", "cost"]
 5. ⏳ **YOLOv8 Integration** - Bounding box detection
 6. ⏳ **Web UI Deployment** - Integrate with backend
 7. ⏳ **Review Queue UI** - Approve/reject flow
+8. ⏳ **Flag Incorrect Info + Feedback** - Per-item "flag incorrect" button + free-text box so the user can report wrong product/name/brand/image/count; Hermes picks the flags up and corrects them
 
 ### P2 - Enhanced Experience
-8. ⏳ **Model Comparison Tests** - Need OpenAI/Gemini credits
-9. ⏳ **ML Accuracy Metrics** - Track detection quality over time
-10. ⏳ **RTSP Camera Support** - For network cameras
-11. ⏳ **Mobile Notifications** - Pushover integration
+9. ⏳ **Model Comparison Tests** - Need OpenAI/Gemini credits
+10. ⏳ **ML Accuracy Metrics** - Track detection quality over time
+11. ⏳ **RTSP Camera Support** - For network cameras
+12. ⏳ **Mobile Notifications** - Pushover integration
 
 ### P2 - Enhanced Experience (Continued)
-12. ⏳ **Household Member Profiles** - Nutrition needs, allergies, preferences
-13. ⏳ **Nutrition Database** - Per-item nutrition facts
-14. ⏳ **Allergen Tracking** - Cross-contamination warnings
-15. ⏳ **Supply Forecasting** - Days of food remaining based on consumption
-16. ❌ **Family Member Tracking** - Who took what
-17. ❌ **Recipe Integration** - Suggest recipes based on stock
-18. ❌ **Expiry Alerts** - Push notifications for expiring items
-19. ❌ **Shopping Integration** - Order from Instacart/etc
+13. ⏳ **Household Member Profiles** - Nutrition needs, allergies, preferences
+14. ⏳ **Nutrition Database** - Per-item nutrition facts
+15. ⏳ **Allergen Tracking** - Cross-contamination warnings
+16. ⏳ **Supply Forecasting** - Days of food remaining based on consumption
+17. ❌ **Family Member Tracking** - Who took what
+18. ❌ **Recipe Integration** - Suggest recipes based on stock
+19. ❌ **Expiry Alerts** - Push notifications for expiring items
+20. ❌ **Shopping Integration** - Order from Instacart/etc
 
 ---
 
@@ -228,4 +246,4 @@ metrics = ["response_time", "items_detected", "accuracy_score", "cost"]
 
 ---
 
-Last Updated: 2026-02-11
+Last Updated: 2026-08-09
