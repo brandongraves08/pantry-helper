@@ -70,7 +70,7 @@
 | Par Levels | ✅ | `par_level` field in inventory_state |
 | Expiration Tracking | ✅ | `expires_at`, `opened_at` fields |
 | Shopping List Generation | ✅ | `/v1/shopping` |
-| Manual Override | ⚠️ | Partial - Review queue exists |
+| Manual Override | ✅ | `/v1/inventory/override` + Add/Edit UI |
 | Product Images | ✅ | OFF backfill + `image_url` in API/UI (2026-08-09) |
 | ⏳ Flag Incorrect Info + Feedback | ⏳ | **PLANNED** - per-item "flag incorrect" button + free-text box so the user can tell the system what's wrong (e.g. wrong product, wrong brand, wrong image, wrong count). System flags item + surfaces the note for correction. |
 
@@ -125,9 +125,9 @@
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| Docker Compose | ⏳ | Files exist but Docker not installed |
-| Production Deployment | 🔴 | Requires sudo for Docker |
-| Database Migrations | ⚠️ | Alembic config issue (no .ini) |
+| Docker Compose | ✅ Running | Full stack on CT202 (api, db, redis, worker, web, flower, promtail) |
+| Production Deployment | ✅ Deployed | `pantry-helper.thelab.lan` (CT202) |
+| Database Migrations | ⚠️ | Alembic files exist but no `alembic.ini`; tables via `create_all` (see AUDIT.md P0-3) |
 | Environment Variables | ✅ | Uses .env, config.py |
 | Health Check | ✅ | `/health` endpoint working |
 
@@ -137,12 +137,13 @@
 
 | Feature | Status | Path |
 |---------|--------|------|
-| React Frontend | ⏳ | `web/` exists but not deployed |
-| Inventory List | ⚠️ | `InventoryList.jsx` exists |
-| Review Queue | ⚠️ | `ReviewQueue.jsx` exists |
-| Manual Override | ⚠️ | `ManualOverride.jsx` exists |
-| Shopping List | ⚠️ | `ShoppingList.jsx` exists |
-| API Client | ⚠️ | `api.js` stub exists |
+| React Frontend | ✅ Deployed & live | `web/` — served on :3000, container `pantry-web` |
+| Inventory List | ✅ | `Inventory.jsx` — list, search, stock filter, sort, thumbnails |
+| Inventory Add/Edit | ✅ | `Inventory.jsx` — Add/Edit modal wired to override API |
+| Review Queue | ⚠️ | `Reviews.jsx` exists, approve/reject wired |
+| Manual Override | ✅ | Via override API (Add/Edit in Inventory) |
+| Shopping List | ✅ | Working |
+| API Client | ✅ | `client.js` |
 
 ---
 
@@ -196,7 +197,7 @@ A deep, end-to-end review of the pantry-helper project to surface issues (bugs, 
 ### P0 - Critical (Blocking Usage)
 1. ❌ **Pi Zero 2 W Client** - Hardware firmware
 2. ✅ ~~Vision Pipeline~~ - FIXED (NVIDIA NIM working)
-3. ⏳ **Docker Deployment** - Need sudo to install Docker
+3. ✅ ~~Docker Deployment~~ - DONE (full stack running on CT202)
 
 ### P1 - Feature Complete MVP
 4. ⏳ **Pattern Learning** - Built but needs filled patterns

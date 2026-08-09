@@ -1,11 +1,24 @@
 import { useEffect, useState } from 'react';
-import { Package, Search, Filter, Plus, ArrowUpDown, AlertTriangle, Apple, X, Check, Loader } from 'lucide-react';
+import { Package, Search, Filter, Plus, ArrowUpDown, AlertTriangle, Apple, X, Check, Loader, Pencil, MapPin } from 'lucide-react';
 import * as api from '../api/client';
 
 export default function Inventory() {
   const [items, setItems] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
+
+  // Filter / sort state
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [stockFilter, setStockFilter] = useState('all'); // all | low | out
+  const [sortField, setSortField] = useState('name');
+  const [sortDir, setSortDir] = useState('asc');
+
+  // Edit / add modal state
+  const [editingItem, setEditingItem] = useState(null); // null = closed
+  const [editForm, setEditForm] = useState({ item_name: '', count_estimate: 1, par_level: 0, location: '', notes: '' });
+  const [savingItem, setSavingItem] = useState(false);
+  const [itemError, setItemError] = useState('');
+  const [itemSuccess, setItemSuccess] = useState('');
 
   // Nutrition state
   const [nutritionItem, setNutritionItem] = useState(null); // item object
@@ -35,6 +48,8 @@ export default function Inventory() {
         par_level: item.par_level || 0,
         expires_at: item.expires_at || new Date(Date.now() + 365 * 86400000).toISOString().split('T')[0],
         image_url: item.image_url ? `${import.meta.env.VITE_API_URL ?? ''}${item.image_url}` : null,
+        location: item.location || null,
+        notes: item.notes || null,
       }));
       setItems(loaded);
     } catch {
@@ -49,11 +64,77 @@ export default function Inventory() {
     }
   };
 
-  const filteredItems = items.filter(item =>
-    item.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
   const lowStockItems = items.filter(item => item.count <= item.par_level);
+
+  // Apply search + stock filter + sort
+  const filteredItems = items
+    .filter(item => item.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    .filter(item => {
+      if (stockFilter === 'low') return item.count <= item.par_level;
+      if (stockFilter === 'out') return item.count <= 0;
+      return true;
+    })
+    .sort((a, b) => {
+      let cmp = 0;
+      const af = a[sortField], bf = b[sortField];
+      if (typeof af === 'number' && typeof bf === 'number') cmp = af - bf;
+      else cmp = String(af ?? '').localeCompare(String(bf ?? ''));
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+
+  // ── Edit / add handlers ──────────────────────────────────────────
+  const openAdd = () => {
+    setEditingItem({ id: null, isNew: true });
+    setEditForm({ item_name: '', count_estimate: 1, par_level: 0, location: '', notes: '' });
+    setItemError('');
+    setItemSuccess('');
+  };
+
+  const openEdit = (item) => {
+    setEditingItem({ id: item.id, isNew: false, itemId: item.item_id });
+    setEditForm({
+      item_name: item.name,
+      count_estimate: item.count,
+      par_level: item.par_level,
+      location: item.location || '',
+      notes: item.notes || '',
+    });
+    setItemError('');
+    setItemSuccess('');
+  };
+
+  const closeEdit = () => {
+    setEditingItem(null);
+    setSavingItem(false);
+  };
+
+  const handleEditField = (key) => (e) =>
+    setEditForm((f) => ({ ...f, [key]: key === 'count_estimate' || key === 'par_level' ? Number(e.target.value) : e.target.value }));
+
+  const handleSaveItem = async () => {
+    if (!editForm.item_name.trim()) {
+      setItemError('Item name is required.');
+      return;
+    }
+    setSavingItem(true);
+    setItemError('');
+    setItemSuccess('');
+    try {
+      await api.overrideInventory({
+        item_name: editForm.item_name.trim(),
+        count_estimate: Math.max(0, Number(editForm.count_estimate) || 0),
+        par_level: editForm.par_level === '' ? null : Math.max(0, Number(editForm.par_level) || 0),
+        location: editForm.location.trim() || null,
+        notes: editForm.notes.trim() || null,
+      });
+      setItemSuccess('Saved.');
+      await loadInventory();
+      setTimeout(closeEdit, 700);
+    } catch (err) {
+      setItemError(err?.response?.data?.detail || 'Failed to save item.');
+      setSavingItem(false);
+    }
+  };
 
   // ── Expiry helpers ──────────────────────────────────────────────
   const today = new Date();
@@ -145,7 +226,7 @@ export default function Inventory() {
     <div className="space-y-4 sm:space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Inventory</h2>
-        <button className="flex items-center gap-2 px-3 sm:px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">
+        <button onClick={openAdd} className="flex items-center gap-2 px-3 sm:px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">
           <Plus size={16} />
           <span className="hidden sm:inline">Add Item</span>
         </button>
@@ -154,7 +235,7 @@ export default function Inventory() {
       {/* Filters & Search */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
         <div className="relative flex-1 max-w-md">
-          <Search size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <Search size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
           <input
             type="text"
             placeholder="Search items..."
@@ -164,13 +245,25 @@ export default function Inventory() {
           />
         </div>
         <div className="flex gap-3">
-          <button className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border rounded-lg hover:bg-gray-50 flex-1 sm:flex-none justify-center">
-            <Filter size={16} />
-            Filter
-          </button>
-          <button className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border rounded-lg hover:bg-gray-50 flex-1 sm:flex-none justify-center">
+          <div className="relative">
+            <button onClick={() => setFilterOpen(!filterOpen)} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border rounded-lg hover:bg-gray-50 flex-1 sm:flex-none justify-center">
+              <Filter size={16} />
+              Filter
+            </button>
+            {filterOpen && (
+              <div className="absolute right-0 z-30 mt-2 w-48 bg-white border rounded-lg shadow-lg p-2">
+                <p className="px-2 py-1 text-xs font-semibold text-gray-400 uppercase">Stock</p>
+                {[{ v: 'all', l: 'All items' }, { v: 'low', l: 'At or below par' }, { v: 'out', l: 'Out of stock' }].map((o) => (
+                  <button key={o.v} onClick={() => { setStockFilter(o.v); setFilterOpen(false); }} className={`block w-full text-left px-2 py-1.5 text-sm rounded ${stockFilter === o.v ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700 hover:bg-gray-50'}`}>
+                    {o.l}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <button onClick={() => { setSortDir(d => d === 'asc' ? 'desc' : 'asc'); }} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border rounded-lg hover:bg-gray-50 flex-1 sm:flex-none justify-center" title="Toggle sort order">
             <ArrowUpDown size={16} />
-            Sort
+            Sort <span className="text-gray-400 text-xs">{sortField} {sortDir}</span>
           </button>
         </div>
       </div>
@@ -237,6 +330,9 @@ export default function Inventory() {
                         {item.brand && (
                           <p className="text-sm text-gray-500 truncate">{item.brand}</p>
                         )}
+                        {item.location && (
+                          <p className="text-xs text-gray-400 flex items-center gap-1"><MapPin size={10} /> {item.location}</p>
+                        )}
                       </div>
                     </div>
                   </td>
@@ -267,7 +363,8 @@ export default function Inventory() {
                     </button>
                   </td>
                   <td className="px-4 sm:px-6 py-4">
-                    <button className="text-blue-600 hover:text-blue-800 text-sm font-medium whitespace-nowrap">
+                    <button onClick={() => openEdit(item)} className="flex items-center gap-1 text-blue-600 hover:text-blue-800 text-sm font-medium whitespace-nowrap">
+                      <Pencil size={14} />
                       Edit
                     </button>
                   </td>
@@ -421,6 +518,97 @@ export default function Inventory() {
             <div className="border-t px-6 py-4">
               <button onClick={closeNutrition} className="w-full px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Add / Edit Item Modal ─────────────────────────────────── */}
+      {editingItem && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900">{editingItem.isNew ? 'Add Item' : `Edit ${editForm.item_name || 'Item'}`}</h3>
+              <button onClick={closeEdit} className="p-1 rounded hover:bg-gray-100">
+                <X size={20} className="text-gray-500" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              {itemSuccess && (
+                <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <Check size={16} className="text-green-600" />
+                  <p className="text-green-700 text-sm">{itemSuccess}</p>
+                </div>
+              )}
+              {itemError && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-red-700 text-sm">{itemError}</p>
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Item Name *</label>
+                <input
+                  type="text"
+                  value={editForm.item_name}
+                  onChange={handleEditField('item_name')}
+                  placeholder="e.g. Black Beans"
+                  className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Count</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={editForm.count_estimate}
+                    onChange={handleEditField('count_estimate')}
+                    className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Par Level</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={editForm.par_level}
+                    onChange={handleEditField('par_level')}
+                    className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                <input
+                  type="text"
+                  value={editForm.location}
+                  onChange={handleEditField('location')}
+                  placeholder="e.g. pantry shelf A"
+                  className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                <textarea
+                  rows="2"
+                  value={editForm.notes}
+                  onChange={handleEditField('notes')}
+                  placeholder="optional"
+                  className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+            <div className="border-t px-6 py-4 flex gap-3">
+              <button onClick={closeEdit} className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveItem}
+                disabled={savingItem}
+                className="flex-1 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                {savingItem ? <Loader size={14} className="animate-spin inline" /> : 'Save'}
               </button>
             </div>
           </div>
