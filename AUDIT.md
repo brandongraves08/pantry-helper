@@ -8,14 +8,15 @@
 
 ## Summary
 
-Project is **functional** (core inventory + shopping + recipes all work, deployed and healthy). The most urgent issues are **security** — the API is effectively unauthenticated with an unsafe CORS config — followed by **dead UI** and a **stale feature doc**. Findings are P0 (act now), P1 (this sprint), P2 (nice-to-have).
+Project is **functional** (core inventory + shopping + recipes all work, deployed and healthy). This pass resolved the security + perf items: write-route auth (P0-1), CORS (P0-2), dead UI buttons + stale doc (P0-4 via the earlier pass), Redis-backed rate limiting (P1-2), and DB indexes (P1-3). Remaining: alembic wiring (P0-3) and the stale-doc corrections are largely done; see details below for status of each finding.
 
 ---
 
 ## P0 — Critical (fix now)
 
 ### P0-1. No authentication on the API (except ingest)
-- **Where:** `app/api/routes/*.py` — only `ingest.py` requires `get_current_device`. Every other route (inventory, override, reviews, recipes, shopping, devices, admin, agent) is unauthenticated.
+- **Status:** ✅ RESOLVED 2026-08-09 — shared Bearer token (`PANTRY_API_TOKEN`) enforced on all write routes via `APIAuthMiddleware` (see P0-1 fix note).
+- **Where:** `backend/app/middleware/api_auth.py`
 - **Impact:** Anyone on the network can overwrite inventory, approve/reject reviews, add/delete recipes, register/delete devices, and hit admin process endpoints. The `agent` endpoints (used by Discord digest) are read-only, but write routes are wide open.
 - **Fix:** Require `get_current_device` (or a bearer token) on all write routes; keep read routes optionally open or token-gated. This is a homelab on 192.168.2.x, so blast radius is LAN-only — but LAN-only is still "trusts LAN, no auth" per existing setup note.
 
