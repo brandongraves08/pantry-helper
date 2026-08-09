@@ -150,6 +150,21 @@ export const getZone = async (id) => {
   return data
 }
 
+export const createZone = async (deviceId, payload) => {
+  const { data } = await apiClient.post(`/v1/zones/device/${deviceId}`, payload)
+  return data
+}
+
+export const deleteZone = async (zoneId) => {
+  const { data } = await apiClient.delete(`/v1/zones/${zoneId}`)
+  return data
+}
+
+export const getZonePatterns = async (zoneId) => {
+  const { data } = await apiClient.get(`/v1/zones/${zoneId}/patterns`)
+  return data
+}
+
 // Household API
 export const listMembers = async () => {
   const { data } = await apiClient.get('/v1/household/members')
