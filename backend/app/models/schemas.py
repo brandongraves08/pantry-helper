@@ -57,6 +57,10 @@ class InventoryResponse(BaseModel):
     """Full inventory response"""
     items: List[InventoryItem]
     updated_at: datetime
+    total: Optional[int] = None
+    page: Optional[int] = None
+    page_size: Optional[int] = None
+    has_more: Optional[bool] = None
 
 class ObservationItem(BaseModel):
     """Parsed observation item from OpenAI Vision"""

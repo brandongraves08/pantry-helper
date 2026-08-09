@@ -151,22 +151,26 @@ async def get_item_history(
 @router.get("/inventory/low-stock")
 async def get_low_stock_items(
     threshold: int = Query(1, ge=0),
+    min_confidence: float = Query(0.5, ge=0, le=1),
     db: Session = Depends(get_db),
 ):
     """
     Get items with stock at or below threshold.
-    
+
     Parameters:
     - threshold: Stock level threshold (default: 1)
-    
+    - min_confidence: Only include items at or above this confidence (default 0.5,
+      excludes unverified/vision-derived items at 0.3). Set 0 to include everything.
+
     Returns:
     - List of low-stock items with current counts
     """
-    logger.info(f"Getting low-stock items (threshold={threshold})...")
+    logger.info(f"Getting low-stock items (threshold={threshold}, min_confidence={min_confidence})...")
     
     try:
         low_stock = db.query(InventoryState).filter(
-            InventoryState.count_estimate <= threshold
+            InventoryState.count_estimate <= threshold,
+            InventoryState.confidence >= min_confidence,
         ).all()
         
         items = []

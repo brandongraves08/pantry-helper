@@ -3,7 +3,7 @@ import io
 import os
 from datetime import datetime
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
@@ -24,9 +24,13 @@ from app.services.storage import get_storage_manager
 router = APIRouter()
 
 @router.get("/inventory", response_model=InventoryResponse)
-async def get_inventory(db: Session = Depends(get_db)):
-    """Get current inventory state"""
-    
+async def get_inventory(
+    db: Session = Depends(get_db),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(0, ge=0, le=500),
+):
+    """Get current inventory state."""
+    # Default (page_size=0) returns all items (backwards-compatible with the frontend).
     states = db.query(InventoryState).all()
     
     items = [
@@ -52,9 +56,18 @@ async def get_inventory(db: Session = Depends(get_db)):
         if state.confidence > 0  # Filter out stale items
     ]
 
+    total = len(items)
+    if page_size > 0:
+        start = (page - 1) * page_size
+        items = items[start:start + page_size]
+
     return InventoryResponse(
         items=items,
         updated_at=datetime.utcnow(),
+        total=total,
+        page=page if page_size > 0 else 1,
+        page_size=page_size if page_size > 0 else total,
+        has_more=page_size > 0 and (page * page_size) < total,
     )
 
 @router.post("/inventory/override")

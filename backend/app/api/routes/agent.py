@@ -62,11 +62,13 @@ def _state_item(state: InventoryState) -> dict:
 
 
 def _low_stock_rows(db: Session, threshold: int) -> list[InventoryState]:
-    states = db.query(InventoryState).all()
+    states = (
+        db.query(InventoryState)
+        .filter(InventoryState.confidence > 0)
+        .all()
+    )
     rows = []
     for state in states:
-        if state.confidence <= 0:
-            continue
         if state.par_level is not None:
             if state.count_estimate < state.par_level:
                 rows.append(state)
@@ -80,13 +82,18 @@ def _expiring_rows(db: Session, days: int) -> list[InventoryState]:
     cutoff = now + timedelta(days=days)
     states = (
         db.query(InventoryState)
-        .filter(InventoryState.expires_at.is_not(None))
+        .filter(
+            InventoryState.expires_at.is_not(None),
+            InventoryState.confidence > 0,
+            InventoryState.count_estimate > 0,
+            InventoryState.expires_at <= cutoff,
+        )
         .all()
     )
     rows = []
     for state in states:
         expires_at = _as_aware(state.expires_at)
-        if expires_at and state.count_estimate > 0 and expires_at <= cutoff:
+        if expires_at:
             rows.append(state)
     return sorted(rows, key=lambda s: _as_aware(s.expires_at) or cutoff)
 
