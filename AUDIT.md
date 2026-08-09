@@ -26,9 +26,8 @@ Project is **functional** (core inventory + shopping + recipes all work, deploye
 - **Fix:** Restrict to the actual web origin(s): `allow_origins=["http://pantry-helper.thelab.lan:3000", "http://localhost:3000"]`.
 
 ### P0-3. Alembic not wired — migrations can't actually run
-- **Where:** repo has `backend/migrations/versions/*.py` and `script.py.mako`, but **no `alembic.ini`** and no `alembic/env.py`.
-- **Impact:** `alembic upgrade head` cannot run. Tables only exist because `Base.metadata.create_all` on startup creates them. Any schema change that needs a real migration (index/column alter) has no path; and the `create_all` vs migration race is fragile.
-- **Fix:** Add `alembic.ini` + `env.py`, OR decide it's fine to rely on `create_all` (works for add-model) and document that that's the mechanism — but remove the broken "run alembic" steps from the deploy plan/skill.
+- **Status:** ✅ RESOLVED / FALSE POSITIVE 2026-08-09 — alembic is fully wired and working. Retracted.
+- **Correction:** Initial audit missed `backend/alembic.ini` (script_location=`migrations/`) + `backend/migrations/env.py` (complete, correct). `alembic==1.12.1` is in `requirements.txt`. Live DB is at revision **006 (head)** — `alembic current` and `alembic heads` both report `006 (head)`, no pending migrations. Indexes added 2026-08-09 are in the models + a manual `CREATE INDEX` pass (note: model `index=True` changes do NOT auto-apply via alembic — a future migration is needed for index-only changes).
 
 ### P0-4. Stale feature doc misleads
 - **Where:** `FEATURE_ARCHITECTURE.md`

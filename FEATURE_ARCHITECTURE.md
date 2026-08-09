@@ -127,7 +127,7 @@
 |-----------|--------|-------|
 | Docker Compose | ✅ Running | Full stack on CT202 (api, db, redis, worker, web, flower, promtail) |
 | Production Deployment | ✅ Deployed | `pantry-helper.thelab.lan` (CT202) |
-| Database Migrations | ⚠️ | Alembic files exist but no `alembic.ini`; tables via `create_all` (see AUDIT.md P0-3) |
+| Database Migrations | ✅ | Alembic wired (`backend/alembic.ini` + migrated `env.py`); live DB at 006 (head) |
 | Environment Variables | ✅ | Uses .env, config.py |
 | Health Check | ✅ | `/health` endpoint working |
 
