@@ -166,6 +166,31 @@ metrics = ["response_time", "items_detected", "accuracy_score", "cost"]
 
 ---
 
+## FULL PROJECT AUDIT (PLANNED)
+
+**Status:** ⏳ Planned / Not Started
+
+A deep, end-to-end review of the pantry-helper project to surface issues (bugs, tech debt, security, brittleness) **and** enhancements (feature gaps, UX improvements). Works alongside the targeted `pantry-helper-usage` / `pantry-app-development` skills.
+
+### Scope
+| Area | Focus |
+|------|-------|
+| Backend API | Route correctness, schema gaps (e.g. the `image_url` Pydantic-drop bug we hit), error handling, auth/security |
+| Database | Schema hygiene, missing indexes, the `create_all` vs `alembic` race, orphaned data |
+| Frontend | Dead UI (buttons with no handlers), image rendering, review-queue UX, responsive polish |
+| Vision/ML | Model fallbacks, confidence thresholds, pattern-learning state, YOLOv8 stub |
+| Deploy/Ops | Docker health, env handling, the "convoluted" no-local-mods rule, logging, retention |
+| Data quality | Inventory items flagged unverified, missing images, stale items, bad OFF image matches |
+| Docs/plan | FEATURE_ARCHITECTURE.md accuracy (many lines are stale — e.g. "React Frontend ⏳ not deployed" is false), skill completeness |
+
+### Planned Deliverables
+1. Audit report with findings prioritized **P0/P1/P2** (bug · security · enhancement).
+2. Concrete fix list mapped to this plan + the `pantry-app-development` skill.
+3. Backlog tidy-up: correct any stale status flags in this file discovered during the audit.
+4. Optional: implement the highest-value fixes (user green-light each).
+
+---
+
 ## PRIORITY BACKLOG
 
 ### P0 - Critical (Blocking Usage)
@@ -179,22 +204,23 @@ metrics = ["response_time", "items_detected", "accuracy_score", "cost"]
 6. ⏳ **Web UI Deployment** - Integrate with backend
 7. ⏳ **Review Queue UI** - Approve/reject flow
 8. ⏳ **Flag Incorrect Info + Feedback** - Per-item "flag incorrect" button + free-text box so the user can report wrong product/name/brand/image/count; Hermes picks the flags up and corrects them
+9. ⏳ **Full Pantry Project Audit** - Deep review of the pantry project for issues & enhancements (see "Full Project Audit" section below)
 
 ### P2 - Enhanced Experience
-9. ⏳ **Model Comparison Tests** - Need OpenAI/Gemini credits
-10. ⏳ **ML Accuracy Metrics** - Track detection quality over time
-11. ⏳ **RTSP Camera Support** - For network cameras
-12. ⏳ **Mobile Notifications** - Pushover integration
+10. ⏳ **Model Comparison Tests** - Need OpenAI/Gemini credits
+11. ⏳ **ML Accuracy Metrics** - Track detection quality over time
+12. ⏳ **RTSP Camera Support** - For network cameras
+13. ⏳ **Mobile Notifications** - Pushover integration
 
 ### P2 - Enhanced Experience (Continued)
-13. ⏳ **Household Member Profiles** - Nutrition needs, allergies, preferences
-14. ⏳ **Nutrition Database** - Per-item nutrition facts
-15. ⏳ **Allergen Tracking** - Cross-contamination warnings
-16. ⏳ **Supply Forecasting** - Days of food remaining based on consumption
-17. ❌ **Family Member Tracking** - Who took what
-18. ❌ **Recipe Integration** - Suggest recipes based on stock
-19. ❌ **Expiry Alerts** - Push notifications for expiring items
-20. ❌ **Shopping Integration** - Order from Instacart/etc
+14. ⏳ **Household Member Profiles** - Nutrition needs, allergies, preferences
+15. ⏳ **Nutrition Database** - Per-item nutrition facts
+16. ⏳ **Allergen Tracking** - Cross-contamination warnings
+17. ⏳ **Supply Forecasting** - Days of food remaining based on consumption
+18. ❌ **Family Member Tracking** - Who took what
+19. ❌ **Recipe Integration** - Suggest recipes based on stock
+20. ❌ **Expiry Alerts** - Push notifications for expiring items
+21. ❌ **Shopping Integration** - Order from Instacart/etc
 
 ---
 
