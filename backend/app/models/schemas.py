@@ -51,6 +51,7 @@ class InventoryItem(BaseModel):
 
     is_manual: bool = False
     notes: Optional[str] = None
+    image_url: Optional[str] = None
 
 class InventoryResponse(BaseModel):
     """Full inventory response"""

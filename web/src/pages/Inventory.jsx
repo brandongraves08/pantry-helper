@@ -34,6 +34,7 @@ export default function Inventory() {
         count: item.count_estimate || 0,
         par_level: item.par_level || 0,
         expires_at: item.expires_at || new Date(Date.now() + 365 * 86400000).toISOString().split('T')[0],
+        image_url: item.image_url ? `${import.meta.env.VITE_API_URL ?? ''}${item.image_url}` : null,
       }));
       setItems(loaded);
     } catch {
@@ -220,8 +221,16 @@ export default function Inventory() {
                 <tr key={item.id} className="hover:bg-gray-50">
                   <td className="px-4 sm:px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center shrink-0">
-                        <Package size={20} className="text-gray-500" />
+                      <div className="w-10 h-10 bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center shrink-0">
+                        {item.image_url ? (
+                          <img
+                            src={item.image_url}
+                            alt={item.name}
+                            className="w-full h-full object-cover"
+                            onError={(e) => { e.target.style.display = 'none'; }}
+                          />
+                        ) : null}
+                        {!item.image_url && <Package size={20} className="text-gray-500" />}
                       </div>
                       <div className="min-w-0">
                         <p className="font-medium text-gray-900 truncate">{item.name}</p>
