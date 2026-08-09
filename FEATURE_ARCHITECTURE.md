@@ -168,7 +168,7 @@ metrics = ["response_time", "items_detected", "accuracy_score", "cost"]
 
 ## FULL PROJECT AUDIT (PLANNED)
 
-**Status:** ⏳ Planned / Not Started
+**Status:** 🔄 Initial pass complete 2026-08-09 → full report in `AUDIT.md` (P0: auth/CORS, alembic, stale doc; P1: dead UI buttons, rate limits, indexes, YOLO stub, failed captures; P2: confidence-aware low-stock, pagination). Fixes awaiting green-light.
 
 A deep, end-to-end review of the pantry-helper project to surface issues (bugs, tech debt, security, brittleness) **and** enhancements (feature gaps, UX improvements). Works alongside the targeted `pantry-helper-usage` / `pantry-app-development` skills.
 
