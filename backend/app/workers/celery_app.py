@@ -31,6 +31,16 @@ celery_app.conf.update(
     include=["app.workers.notify"],
 )
 
+# Periodic (celery beat) schedule — runs when the worker is started with -B.
+# None of this runs automatically by default; see the worker command in compose.
+from celery.schedules import crontab  # noqa: E402
+celery_app.conf.beat_schedule = {
+    "enforce-image-retention-daily": {
+        "task": "app.workers.celery_app.enforce_image_retention",
+        "schedule": crontab(hour=3, minute=0),  # daily at 03:00 UTC
+    },
+}
+
 
 class DatabaseTask(Task):
     """Task with database session management."""
@@ -127,6 +137,20 @@ def process_pending_captures(self) -> dict:
     finally:
         if db:
             db.close()
+
+
+@celery_app.task(bind=True, base=DatabaseTask, max_retries=settings.MAX_RETRIES)
+def enforce_image_retention(self) -> dict:
+    """Periodic task: enforce image retention policy (delete images older than IMAGE_RETENTION_DAYS)."""
+    from app.workers.retention import get_retention_enforcer
+    logger.info("Running scheduled image retention enforcement")
+    try:
+        result = get_retention_enforcer().enforce_retention()
+        logger.info("Retention enforcement done", extra=result)
+        return result
+    except Exception as exc:
+        logger.error("Retention enforcement failed", extra={"error": str(exc)})
+        raise self.retry(exc=exc, countdown=300)
 
 
 @celery_app.task

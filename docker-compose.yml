@@ -126,7 +126,7 @@ services:
       - ./data/storage:/data/storage
       - /home/openclaw/.openclaw/secrets/openclaw.gateway.token:/run/secrets/openclaw_gateway_token:ro
     logging: *default-logging
-    command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=4
+    command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=4 -B
     healthcheck:
       test: ["CMD-SHELL", "grep -qa 'celery' /proc/1/cmdline && grep -qa 'worker' /proc/1/cmdline || exit 1"]
       interval: 30s
