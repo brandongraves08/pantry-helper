@@ -48,6 +48,11 @@ class Settings(BaseSettings):
     RATE_LIMIT_REQUESTS: int = 100
     RATE_LIMIT_PERIOD: int = 60  # seconds
 
+    # Shared API token (Bearer) required on all write routes.
+    # Set PANTRY_API_TOKEN in the environment/.env. If not set, writes are
+    # allowed (dev mode) so existing setups don't break; production should set it.
+    PANTRY_API_TOKEN: Optional[str] = os.getenv("PANTRY_API_TOKEN")
+
     # Job Queue Configuration
     CELERY_BROKER_URL: str = os.getenv(
         "CELERY_BROKER_URL", "redis://localhost:6379/0"

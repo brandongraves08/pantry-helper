@@ -10,6 +10,16 @@ const apiClient = axios.create({
   timeout: 30000,
 })
 
+// Attach shared API token (PANTRY_API_TOKEN) as Bearer on every request,
+// so write routes (protected by APIAuthMiddleware) succeed.
+const API_TOKEN = import.meta.env.VITE_PANTRY_API_TOKEN
+if (API_TOKEN) {
+  apiClient.interceptors.request.use((config) => {
+    config.headers.Authorization = `Bearer ${API_TOKEN}`
+    return config
+  })
+}
+
 // Request interceptor
 apiClient.interceptors.request.use(
   (config) => {

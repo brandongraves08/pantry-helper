@@ -17,6 +17,7 @@ from app.db.database import engine, Base
 from app.exceptions import PantryException
 from app.middleware.rate_limit import RateLimitMiddleware
 from app.middleware.request_log import RequestLogMiddleware
+from app.middleware.api_auth import APIAuthMiddleware
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -45,6 +46,9 @@ async def pantry_exception_handler(request, exc: PantryException):
 
 # Request logging middleware (outermost — captures all requests including rate-limited ones)
 app.add_middleware(RequestLogMiddleware)
+
+# Shared API token auth on write routes (skips /v1/ingest*, which uses device tokens)
+app.add_middleware(APIAuthMiddleware)
 
 # Rate limiting middleware (must be added before CORS)
 app.add_middleware(RateLimitMiddleware)

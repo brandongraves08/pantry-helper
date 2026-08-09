@@ -1,4 +1,4 @@
-"""Authentication utilities for ESP32 device tokens."""
+"""Authentication utilities for ESP32 device tokens and shared API access."""
 import hashlib
 import hmac
 import secrets

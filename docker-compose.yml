@@ -70,6 +70,7 @@ services:
       DEBUG: ${DEBUG:-false}
       SERVICE_NAME: pantry-api
       PANTRY_DISCORD_WEBHOOK: ${PANTRY_DISCORD_WEBHOOK:-}
+      PANTRY_API_TOKEN: ${PANTRY_API_TOKEN:-}
     ports:
       - "8000:8000"
     depends_on:
@@ -170,6 +171,7 @@ services:
       target: prod
       args:
         VITE_API_URL: http://pantry-helper.thelab.lan:8000
+        VITE_PANTRY_API_TOKEN: ${PANTRY_API_TOKEN:-}
     container_name: pantry-web
     ports:
       - "3000:80"
