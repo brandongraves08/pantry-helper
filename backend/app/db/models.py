@@ -22,13 +22,13 @@ class Capture(Base):
     __tablename__ = "captures"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    device_id = Column(String, ForeignKey("devices.id"), nullable=False)
+    device_id = Column(String, ForeignKey("devices.id"), nullable=False, index=True)
     trigger_type = Column(String, nullable=False)  # door, light, timer, manual
     captured_at = Column(DateTime(timezone=True), nullable=False)
     image_path = Column(String, nullable=False)
     battery_v = Column(Float, nullable=True)
     rssi = Column(Integer, nullable=True)
-    status = Column(String, nullable=False, default="stored")  # stored, analyzing, complete, failed
+    status = Column(String, nullable=False, default="stored", index=True)  # stored, analyzing, complete, failed
     error_message = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
@@ -39,7 +39,7 @@ class Observation(Base):
     __tablename__ = "observations"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    capture_id = Column(String, ForeignKey("captures.id"), nullable=False)
+    capture_id = Column(String, ForeignKey("captures.id"), nullable=False, index=True)
     raw_json = Column(JSON, nullable=False)
     scene_confidence = Column(Float, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -77,8 +77,8 @@ class InventoryState(Base):
     __tablename__ = "inventory_state"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    item_id = Column(String, ForeignKey("inventory_items.id"), nullable=False)
-    location_id = Column(String, ForeignKey("locations.id"), nullable=True)
+    item_id = Column(String, ForeignKey("inventory_items.id"), nullable=False, index=True)
+    location_id = Column(String, ForeignKey("locations.id"), nullable=True, index=True)
 
     count_estimate = Column(Integer, nullable=False, default=0)
     confidence = Column(Float, nullable=False, default=0.0)
@@ -100,8 +100,8 @@ class InventoryEvent(Base):
     __tablename__ = "inventory_events"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    item_id = Column(String, ForeignKey("inventory_items.id"), nullable=False)
-    capture_id = Column(String, ForeignKey("captures.id"), nullable=True)
+    item_id = Column(String, ForeignKey("inventory_items.id"), nullable=False, index=True)
+    capture_id = Column(String, ForeignKey("captures.id"), nullable=True, index=True)
     event_type = Column(String, nullable=False)  # seen, adjusted, manual_override
     delta = Column(Integer, nullable=False, default=0)
     details = Column(JSON, nullable=True)
