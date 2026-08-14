@@ -21,11 +21,14 @@ async def list_unverified(
 
     Ordered oldest-last-seen first so the user works through stale items first.
     """
-    items = (
+    base = (
         db.query(InventoryItem)
         .join(InventoryState, InventoryState.item_id == InventoryItem.id)
         .filter(InventoryState.confidence < min_confidence)
-        .order_by(InventoryState.last_seen_at.asc().nullsfirst(), InventoryItem.canonical_name.asc())
+    )
+    total = base.count()
+    items = (
+        base.order_by(InventoryState.last_seen_at.asc().nullsfirst(), InventoryItem.canonical_name.asc())
         .limit(limit)
         .all()
     )
@@ -42,7 +45,7 @@ async def list_unverified(
             }
             for it in items
         ],
-        "total": len(items),
+        "total": total,
     }
 
 
