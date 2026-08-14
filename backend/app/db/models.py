@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, Float, Integer, Boolean, Text, ForeignKey, JSON
+from sqlalchemy import Column, String, DateTime, Date, Float, Integer, Boolean, Text, ForeignKey, JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import uuid
@@ -114,7 +114,8 @@ class ShoppingListItem(Base):
     __tablename__ = "shopping_list_items"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    item_id = Column(String, ForeignKey("inventory_items.id"), nullable=False)
+    item_id = Column(String, ForeignKey("inventory_items.id"), nullable=True)
+    item_name = Column(String, nullable=True)  # free-text fallback for untracked/meal-plan items
     location_id = Column(String, ForeignKey("locations.id"), nullable=True)
     needed = Column(Integer, nullable=False, default=0)
     reason = Column(String, nullable=True)
@@ -351,3 +352,40 @@ class RecipeIngredient(Base):
 
     recipe = relationship("Recipe", back_populates="ingredients")
     inventory_item = relationship("InventoryItem")
+
+
+class MealPlan(Base):
+    """A weekly meal plan (Mon-Sun). Entries hold one recipe per day/meal slot."""
+
+    __tablename__ = "meal_plans"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    week_start = Column(Date, nullable=False, index=True)  # Monday of the plan week
+    name = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    entries = relationship(
+        "MealPlanEntry",
+        back_populates="meal_plan",
+        cascade="all, delete-orphan",
+        order_by="MealPlanEntry.plan_date",
+    )
+
+
+class MealPlanEntry(Base):
+    """A single scheduled meal: a recipe on a specific day, scaled by servings_multiplier."""
+
+    __tablename__ = "meal_plan_entries"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    meal_plan_id = Column(String, ForeignKey("meal_plans.id"), nullable=False, index=True)
+    plan_date = Column(Date, nullable=False, index=True)
+    meal_type = Column(String, nullable=False)  # breakfast | lunch | dinner | snack
+    recipe_id = Column(String, ForeignKey("recipes.id"), nullable=False)
+    servings_multiplier = Column(Integer, nullable=False, default=1)  # 1x recipe = recipe servings
+    notes = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    meal_plan = relationship("MealPlan", back_populates="entries")
+    recipe = relationship("Recipe")

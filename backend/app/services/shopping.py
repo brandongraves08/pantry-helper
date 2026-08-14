@@ -44,7 +44,11 @@ def recompute_shopping_list(db: Session) -> int:
 
 
 def get_unresolved_items(db: Session) -> list[dict]:
-    """Return unresolved shopping list items as plain dicts (name, needed, reason, location)."""
+    """Return unresolved shopping list items as plain dicts (name, needed, reason, location).
+
+    item_name falls back to the free-text name for untracked/meal-plan rows
+    (item_id NULL), so they still surface for the HEB cart filler.
+    """
     rows = (
         db.query(ShoppingListItemModel)
         .filter(ShoppingListItemModel.resolved_at.is_(None))
@@ -52,7 +56,8 @@ def get_unresolved_items(db: Session) -> list[dict]:
     )
     return [
         {
-            "item_name": row.item.canonical_name,
+            "item_name": row.item_name
+            or (row.item.canonical_name if row.item else "unknown"),
             "needed": row.needed,
             "reason": row.reason,
             "location": (row.location.name if row.location else None),

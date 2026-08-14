@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, date
 
 class IngestRequest(BaseModel):
     """Ingest request from ESP32"""
@@ -283,3 +283,80 @@ class DeviceHealthResponse(BaseModel):
     failed_7d: int
     analyzing_7d: int
     success_rate_7d: float
+
+
+# ── Meal Plan Schemas ────────────────────────────────────────────────
+
+class MealPlanCreate(BaseModel):
+    """Create a weekly meal plan."""
+    week_start: date  # Monday of the plan week
+    name: Optional[str] = None
+
+
+class MealPlanEntryInput(BaseModel):
+    """Schedule a recipe on a specific day/meal slot."""
+    plan_date: date
+    meal_type: str  # breakfast | lunch | dinner | snack
+    recipe_id: str
+    servings_multiplier: int = 1
+    notes: Optional[str] = None
+
+
+class MealPlanEntryResponse(BaseModel):
+    """A single scheduled meal."""
+    id: str
+    plan_date: date
+    meal_type: str
+    recipe_id: str
+    recipe_name: Optional[str] = None
+    servings_multiplier: int = 1
+    notes: Optional[str] = None
+
+
+class MealPlanResponse(BaseModel):
+    """A meal plan with its entries."""
+    id: str
+    week_start: date
+    name: Optional[str] = None
+    entries: List[MealPlanEntryResponse] = []
+    created_at: datetime
+    updated_at: datetime
+
+
+class MealPlanListResponse(BaseModel):
+    """List of meal plans."""
+    plans: List[MealPlanResponse]
+    total: int
+
+
+class MealPlanItemNeed(BaseModel):
+    """One ingredient's stock status across all planned meals."""
+    name: str
+    quantity: Optional[str] = None
+    inventory_item_id: Optional[str] = None
+    inventory_item_name: Optional[str] = None
+    required_units: Optional[float] = None
+    available_units: Optional[float] = None
+    missing_units: Optional[float] = None
+    status: str  # ok | short | not_tracked
+    approx: bool = False  # True when quantity math is a heuristic (weight/volume units)
+    sources: List[dict] = []  # [{date, meal_type, recipe, quantity, servings_multiplier}]
+
+
+class MealPlanVerifyResponse(BaseModel):
+    """Aggregated verification of a meal plan against pantry stock."""
+    plan_id: str
+    week_start: date
+    start: date
+    end: date
+    items: List[MealPlanItemNeed]
+    summary: dict  # {ok, short, not_tracked, total}
+    updated_at: datetime
+
+
+class MealPlanUpdateShoppingResponse(BaseModel):
+    """Result of merging missing meal-plan items into the shopping list."""
+    plan_id: str
+    added: int
+    items: List[MealPlanItemNeed]
+    updated_at: datetime
