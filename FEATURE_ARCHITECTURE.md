@@ -69,7 +69,7 @@
 | Locations | ✅ | `/v1/locations` |
 | Par Levels | ✅ | `par_level` field in inventory_state |
 | Expiration Tracking | ✅ | `expires_at`, `opened_at` fields |
-| Shopping List Generation | ✅ | `/v1/shopping` |
+| Shopping List Generation | ✅ | `/v1/shopping` (par-driven) + meal-plan merge (`/v1/meal-plans/{id}/update-shopping`, 2026-08-14) |
 | Manual Override | ✅ | `/v1/inventory/override` + Add/Edit UI |
 | Product Images | ✅ | OFF backfill + `image_url` in API/UI (2026-08-09) |
 | ⏳ Flag Incorrect Info + Feedback | ⏳ | **PLANNED** - per-item "flag incorrect" button + free-text box so the user can tell the system what's wrong (e.g. wrong product, wrong brand, wrong image, wrong count). System flags item + surfaces the note for correction. |
@@ -257,7 +257,7 @@ A deep, end-to-end review of the pantry-helper project to surface issues (bugs, 
 | Consumption Tracking | ❌ | Track what gets used when |
 | Depletion Estimates | ❌ | "7 days of cereal remaining" |
 | Restock Recommendations | ❌ | Buy before you run out |
-| Meal Planning Integration | ❌ | Factor in planned meals |
+| Meal Planning Integration | ✅ | Weekly plans + verify vs pantry + merge to shopping (2026-08-14) |
 
 ---
 
