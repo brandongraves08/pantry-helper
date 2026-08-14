@@ -112,7 +112,7 @@ class InventoryManager:
         ).first()
 
         if not inv_item:
-            inv_item = InventoryItem(canonical_name=item_name)
+            inv_item = InventoryItem(canonical_name=item_name, heb_status="pending")
             self.db.add(inv_item)
             self.db.flush()
 

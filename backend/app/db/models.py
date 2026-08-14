@@ -70,6 +70,13 @@ class InventoryItem(Base):
     rating = Column(Float, nullable=True)  # 1-5, user rating for this item/brand
     is_favorite = Column(Boolean, nullable=False, default=False)
     image_path = Column(String, nullable=True)
+    # HEB product enrichment (brand/product/price/image pulled from heb.com)
+    heb_product_name = Column(String, nullable=True)
+    heb_url = Column(String, nullable=True)
+    heb_price = Column(Float, nullable=True)
+    heb_image_url = Column(String, nullable=True)
+    heb_status = Column(String, nullable=False, default="pending")  # pending | done | failed
+    heb_lookup_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     states = relationship("InventoryState", back_populates="item")

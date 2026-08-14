@@ -52,6 +52,11 @@ async def get_inventory(
             notes=state.notes,
             rating=getattr(state.item, "rating", None),
             is_favorite=bool(getattr(state.item, "is_favorite", False)),
+            heb_product_name=getattr(state.item, "heb_product_name", None),
+            heb_url=getattr(state.item, "heb_url", None),
+            heb_price=getattr(state.item, "heb_price", None),
+            heb_image_url=getattr(state.item, "heb_image_url", None),
+            heb_status=getattr(state.item, "heb_status", "pending"),
             image_url=f"/v1/inventory/{state.item.id}/image" if state.item.image_path else None,
         )
         for state in states

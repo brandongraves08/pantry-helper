@@ -53,6 +53,13 @@ class InventoryItem(BaseModel):
     rating: Optional[float] = None
     is_favorite: bool = False
 
+    # HEB enrichment
+    heb_product_name: Optional[str] = None
+    heb_url: Optional[str] = None
+    heb_price: Optional[float] = None
+    heb_image_url: Optional[str] = None
+    heb_status: Optional[str] = "pending"
+
     is_manual: bool = False
     notes: Optional[str] = None
     image_url: Optional[str] = None
@@ -94,6 +101,20 @@ class InventoryOverride(BaseModel):
     brand: Optional[str] = None
     rating: Optional[float] = None
     is_favorite: Optional[bool] = None
+
+
+class InventoryVerifyRequest(BaseModel):
+    """User-confirmed count for an inventory item."""
+    count_estimate: int
+    notes: Optional[str] = None
+
+
+class HebEnrichmentPayload(BaseModel):
+    """HEB product info pulled from heb.com for an inventory item."""
+    product_name: Optional[str] = None
+    url: Optional[str] = None
+    price: Optional[float] = None
+    image_url: Optional[str] = None
 
 
 class ShoppingListItem(BaseModel):

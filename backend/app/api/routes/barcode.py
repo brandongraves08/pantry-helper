@@ -201,6 +201,7 @@ async def add_barcode_to_inventory(
             brand=request.brand,
             package_type=request.package_type,
             category=request.category,
+            heb_status="pending",
         )
         db.add(item)
         db.flush()
