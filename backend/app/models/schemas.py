@@ -49,6 +49,10 @@ class InventoryItem(BaseModel):
     opened_at: Optional[datetime] = None
     par_level: Optional[int] = None
 
+    # Brand rating / favorite
+    rating: Optional[float] = None
+    is_favorite: bool = False
+
     is_manual: bool = False
     notes: Optional[str] = None
     image_url: Optional[str] = None
@@ -87,6 +91,9 @@ class InventoryOverride(BaseModel):
     expires_at: Optional[datetime] = None
     opened_at: Optional[datetime] = None
     par_level: Optional[int] = None
+    brand: Optional[str] = None
+    rating: Optional[float] = None
+    is_favorite: Optional[bool] = None
 
 
 class ShoppingListItem(BaseModel):
@@ -195,6 +202,8 @@ class RecipeCreate(BaseModel):
     prep_time_min: Optional[int] = None
     cook_time_min: Optional[int] = None
     instructions: Optional[str] = None
+    rating: Optional[float] = None
+    is_favorite: Optional[bool] = False
     ingredients: Optional[List[RecipeIngredientInput]] = []
 
 
@@ -219,6 +228,8 @@ class Recipe(BaseModel):
     prep_time_min: Optional[int] = None
     cook_time_min: Optional[int] = None
     instructions: Optional[str] = None
+    rating: Optional[float] = None
+    is_favorite: Optional[bool] = False
     ingredients: List[RecipeIngredient] = []
     created_at: datetime
     updated_at: datetime

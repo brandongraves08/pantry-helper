@@ -22,8 +22,8 @@ class VisionAnalyzer:
 
         logger.info("Initializing vision analyzer", extra={"provider": self.provider})
 
-        if self.provider in ("openclaw", "openclaw-gateway"):
-            self._init_openclaw()
+        if self.provider in ("hermes", "hermes-gateway"):
+            self._init_hermes()
         elif self.provider == "openai":
             self._init_openai()
         elif self.provider == "nvidia":
@@ -32,21 +32,17 @@ class VisionAnalyzer:
             self._init_ollama()
         elif self.provider in ("mock", "none"):
             self._init_mock()
+        elif self.provider == "openclaw":
+            # Legacy branch — kept for existing deployments, NOT documented/supported.
+            self._init_openclaw()
         else:
             raise ValueError(f"Unsupported vision provider: {self.provider}")
 
     def _get_api_key(self) -> str:
-        if self.provider in ("openclaw", "openclaw-gateway"):
-            key = os.getenv("OPENCLAW_GATEWAY_TOKEN")
-            token_file = os.getenv("OPENCLAW_GATEWAY_TOKEN_FILE")
-            if not key and token_file:
-                try:
-                    with open(token_file, "r", encoding="utf-8") as f:
-                        key = f.read().strip()
-                except OSError as e:
-                    raise ValueError(f"OPENCLAW_GATEWAY_TOKEN_FILE is unreadable: {e}")
+        if self.provider in ("hermes", "hermes-gateway"):
+            key = os.getenv("HERMES_API_KEY") or os.getenv("OPENAI_API_KEY")
             if not key:
-                raise ValueError("OPENCLAW_GATEWAY_TOKEN or OPENCLAW_GATEWAY_TOKEN_FILE is required for OpenClaw provider")
+                raise ValueError("HERMES_API_KEY (or OPENAI_API_KEY) is required for Hermes provider")
             return key
         if self.provider == "openai":
             key = os.getenv("OPENAI_API_KEY")
@@ -58,7 +54,34 @@ class VisionAnalyzer:
             if not key:
                 raise ValueError("NVIDIA_NIM_API_KEY is required for NVIDIA provider")
             return key
+        if self.provider == "openclaw":
+            key = os.getenv("OPENCLAW_GATEWAY_TOKEN")
+            token_file = os.getenv("OPENCLAW_GATEWAY_TOKEN_FILE")
+            if not key and token_file:
+                try:
+                    with open(token_file, "r", encoding="utf-8") as f:
+                        key = f.read().strip()
+                except OSError as e:
+                    raise ValueError(f"OPENCLAW_GATEWAY_TOKEN_FILE is unreadable: {e}")
+            if not key:
+                raise ValueError("OPENCLAW_GATEWAY_TOKEN or OPENCLAW_GATEWAY_TOKEN_FILE is required for OpenClaw provider")
+            return key
         return ""
+
+    def _init_hermes(self):
+        """Hermes vision: agent-driven analysis via an OpenAI-compatible endpoint.
+
+        Point HERMES_VISION_URL at your agent's OpenAI-compatible vision endpoint
+        (or leave unset to use the OpenAI API directly with HERMES_API_KEY).
+        """
+        try:
+            from openai import OpenAI
+            base_url = os.getenv("HERMES_VISION_URL") or None
+            self.client = OpenAI(api_key=self.api_key, base_url=base_url) if base_url else OpenAI(api_key=self.api_key)
+            self.model = os.getenv("HERMES_MODEL", "gpt-4-vision-preview")
+            logger.info("Hermes vision provider initialized", extra={"model": self.model, "base_url": base_url or "openai"})
+        except ImportError:
+            raise ImportError("openai package not installed. Run: pip install openai")
 
     def _init_openclaw(self):
         self.vision_url = os.getenv(
@@ -103,10 +126,10 @@ class VisionAnalyzer:
             "image_path": image_path,
         })
         try:
+            if self.provider in ("hermes", "hermes-gateway", "openai"):
+                return self._analyze_openai(image_path)
             if self.provider in ("openclaw", "openclaw-gateway"):
                 return self._analyze_openclaw(image_path)
-            if self.provider == "openai":
-                return self._analyze_openai(image_path)
             if self.provider == "nvidia":
                 return self._analyze_nvidia(image_path)
             if self.provider == "ollama":

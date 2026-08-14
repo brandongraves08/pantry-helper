@@ -36,6 +36,8 @@ def _serialize(recipe: RecipeModel) -> RecipeSchema:
         prep_time_min=recipe.prep_time_min,
         cook_time_min=recipe.cook_time_min,
         instructions=recipe.instructions,
+        rating=recipe.rating,
+        is_favorite=recipe.is_favorite,
         ingredients=ingredients,
         created_at=recipe.created_at,
         updated_at=recipe.updated_at,
@@ -78,6 +80,8 @@ async def create_recipe(payload: RecipeCreate, db: Session = Depends(get_db)):
         prep_time_min=payload.prep_time_min,
         cook_time_min=payload.cook_time_min,
         instructions=payload.instructions,
+        rating=payload.rating,
+        is_favorite=payload.is_favorite or False,
     )
     db.add(recipe)
     db.flush()
@@ -111,6 +115,10 @@ async def update_recipe(recipe_id: str, payload: RecipeCreate, db: Session = Dep
     recipe.prep_time_min = payload.prep_time_min
     recipe.cook_time_min = payload.cook_time_min
     recipe.instructions = payload.instructions
+    if payload.rating is not None:
+        recipe.rating = payload.rating
+    if payload.is_favorite is not None:
+        recipe.is_favorite = payload.is_favorite
 
     # Replace ingredients
     recipe.ingredients.clear()

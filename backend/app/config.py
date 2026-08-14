@@ -19,17 +19,15 @@ class Settings(BaseSettings):
     )
 
     # Vision Provider Configuration
-    VISION_PROVIDER: str = os.getenv("VISION_PROVIDER", "openclaw")
-    
-    # OpenClaw Gateway Configuration
-    OPENCLAW_VISION_URL: str = os.getenv(
-        "OPENCLAW_VISION_URL",
-        "http://localhost:18790/analyze",
-    )
-    OPENCLAW_GATEWAY_TOKEN: Optional[str] = os.getenv("OPENCLAW_GATEWAY_TOKEN")
-    OPENCLAW_GATEWAY_TOKEN_FILE: Optional[str] = os.getenv("OPENCLAW_GATEWAY_TOKEN_FILE")
-    OPENCLAW_VISION_MODEL: str = os.getenv("OPENCLAW_VISION_MODEL", "openai/gpt-5.4-mini")
-    OPENCLAW_TIMEOUT: int = int(os.getenv("OPENCLAW_TIMEOUT", "120"))
+    # Default is "hermes" (agent-driven analysis). Other supported providers:
+    # openai, nvidia, ollama, mock. OpenClaw is NOT used/tested/supported.
+    VISION_PROVIDER: str = os.getenv("VISION_PROVIDER", "hermes")
+
+    # Hermes Vision (agent-driven analysis via OpenAI-compatible endpoint)
+    HERMES_VISION_URL: str = os.getenv("HERMES_VISION_URL", "")
+    HERMES_API_KEY: Optional[str] = os.getenv("HERMES_API_KEY")
+    HERMES_MODEL: str = os.getenv("HERMES_MODEL", "gpt-4-vision-preview")
+    HERMES_TIMEOUT: int = int(os.getenv("HERMES_TIMEOUT", "120"))
 
     # OpenAI Configuration
     OPENAI_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY")

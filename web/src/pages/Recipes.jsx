@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { BookOpen, Plus, Search, X, Trash2, Edit, Loader, ShoppingCart, Check, ChevronDown } from 'lucide-react';
+import { BookOpen, Plus, Search, X, Trash2, Edit, Loader, ShoppingCart, Check, ChevronDown, Star, Heart } from 'lucide-react';
 import * as api from '../api/client';
 
 export default function Recipes() {
@@ -31,6 +31,8 @@ export default function Recipes() {
       prep_time_min: '',
       cook_time_min: '',
       instructions: '',
+      rating: null,
+      is_favorite: false,
       ingredients: [{ quantity: '', name: '', note: '' }],
     };
   }
@@ -69,6 +71,8 @@ export default function Recipes() {
       prep_time_min: recipe.prep_time_min || '',
       cook_time_min: recipe.cook_time_min || '',
       instructions: recipe.instructions || '',
+      rating: recipe.rating || null,
+      is_favorite: recipe.is_favorite || false,
       ingredients: (recipe.ingredients || []).length
         ? recipe.ingredients.map((i) => ({ quantity: i.quantity || '', name: i.name, note: i.note || '' }))
         : [{ quantity: '', name: '', note: '' }],
@@ -103,6 +107,8 @@ export default function Recipes() {
       prep_time_min: form.prep_time_min ? Number(form.prep_time_min) : null,
       cook_time_min: form.cook_time_min ? Number(form.cook_time_min) : null,
       instructions: form.instructions || null,
+      rating: form.rating || null,
+      is_favorite: form.is_favorite || false,
       ingredients: form.ingredients
         .filter((i) => i.name.trim())
         .map((i) => ({
@@ -136,6 +142,56 @@ export default function Recipes() {
     } catch (err) {
       console.error('Failed to delete recipe:', err);
       alert('Failed to delete recipe');
+    }
+  };
+
+  const handleRate = async (recipe, rating) => {
+    try {
+      await api.updateRecipe(recipe.id, {
+        name: recipe.name,
+        description: recipe.description || null,
+        source: recipe.source || null,
+        servings: recipe.servings || null,
+        prep_time_min: recipe.prep_time_min || null,
+        cook_time_min: recipe.cook_time_min || null,
+        instructions: recipe.instructions || null,
+        rating,
+        is_favorite: recipe.is_favorite,
+        ingredients: (recipe.ingredients || []).map((i) => ({
+          quantity: i.quantity || null,
+          name: i.name,
+          note: i.note || null,
+          inventory_item_id: i.inventory_item_id || null,
+        })),
+      });
+      await loadRecipes();
+    } catch (err) {
+      console.error('Failed to rate recipe:', err);
+    }
+  };
+
+  const handleFavorite = async (recipe) => {
+    try {
+      await api.updateRecipe(recipe.id, {
+        name: recipe.name,
+        description: recipe.description || null,
+        source: recipe.source || null,
+        servings: recipe.servings || null,
+        prep_time_min: recipe.prep_time_min || null,
+        cook_time_min: recipe.cook_time_min || null,
+        instructions: recipe.instructions || null,
+        rating: recipe.rating,
+        is_favorite: !recipe.is_favorite,
+        ingredients: (recipe.ingredients || []).map((i) => ({
+          quantity: i.quantity || null,
+          name: i.name,
+          note: i.note || null,
+          inventory_item_id: i.inventory_item_id || null,
+        })),
+      });
+      await loadRecipes();
+    } catch (err) {
+      console.error('Failed to favorite recipe:', err);
     }
   };
 
@@ -209,6 +265,13 @@ export default function Recipes() {
                 </div>
                 <div className="flex gap-1 shrink-0">
                   <button
+                    onClick={() => handleFavorite(recipe)}
+                    className={`p-1.5 rounded hover:bg-pink-50 ${recipe.is_favorite ? 'text-pink-500' : 'text-gray-300 hover:text-pink-400'}`}
+                    aria-label={recipe.is_favorite ? 'Unfavorite' : 'Favorite'}
+                  >
+                    <Heart size={15} fill={recipe.is_favorite ? 'currentColor' : 'none'} />
+                  </button>
+                  <button
                     onClick={() => openEdit(recipe)}
                     className="p-1.5 rounded hover:bg-gray-100 text-gray-500"
                     aria-label="Edit"
@@ -228,7 +291,21 @@ export default function Recipes() {
                 <p className="text-sm text-gray-600 mt-2 line-clamp-2">{recipe.description}</p>
               )}
               <div className="mt-3 flex items-center justify-between text-xs text-gray-400">
-                <span>{recipe.ingredients?.length || 0} ingredients</span>
+                <div className="flex items-center gap-1">
+                  <span className="mr-1">{recipe.ingredients?.length || 0} ingredients</span>
+                  <span className="flex items-center gap-0.5">
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <button
+                        key={n}
+                        onClick={() => handleRate(recipe, recipe.rating === n ? null : n)}
+                        className={`${recipe.rating >= n ? 'text-amber-400' : 'text-gray-300 hover:text-amber-300'}`}
+                        aria-label={`Rate ${n} stars`}
+                      >
+                        <Star size={13} fill={recipe.rating >= n ? 'currentColor' : 'none'} />
+                      </button>
+                    ))}
+                  </span>
+                </div>
                 <button
                   onClick={() => openView(recipe)}
                   className="flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium"
@@ -354,6 +431,37 @@ export default function Recipes() {
                   rows={4}
                   placeholder="Steps..."
                 />
+              </div>
+
+              <div className="flex items-center gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Rating</label>
+                  <span className="flex items-center gap-0.5">
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => setForm({ ...form, rating: form.rating === n ? null : n })}
+                        className={`${form.rating >= n ? 'text-amber-400' : 'text-gray-300 hover:text-amber-300'}`}
+                        aria-label={`Rate ${n} stars`}
+                      >
+                        <Star size={18} fill={form.rating >= n ? 'currentColor' : 'none'} />
+                      </button>
+                    ))}
+                  </span>
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer mt-4">
+                  <input
+                    type="checkbox"
+                    checked={form.is_favorite}
+                    onChange={(e) => setForm({ ...form, is_favorite: e.target.checked })}
+                    className="h-4 w-4 rounded border-gray-300"
+                  />
+                  <span className="flex items-center gap-1 text-sm text-gray-700">
+                    <Heart size={15} className={form.is_favorite ? 'text-pink-500' : 'text-gray-400'} fill={form.is_favorite ? 'currentColor' : 'none'} />
+                    Favorite
+                  </span>
+                </label>
               </div>
             </div>
 

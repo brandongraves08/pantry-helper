@@ -1,8 +1,8 @@
 # Vision AI Provider Configuration
 
-The Pantry Inventory System supports several Vision AI providers for image analysis, selected via the `VISION_PROVIDER` env var:
+The Pantry Inventory System analyzes captured images with a configurable vision provider, selected via the `VISION_PROVIDER` env var:
 
-- **OpenClaw gateway** (default) — routes to a model of your choice through a local gateway
+- **Hermes** (default) — agent-driven analysis through an OpenAI-compatible endpoint
 - **OpenAI GPT-4 Vision** — direct OpenAI API
 - **NVIDIA NIM** — self-hosted or cloud NVIDIA endpoints
 - **Ollama** — fully local models (e.g. llava)
@@ -12,14 +12,16 @@ The Pantry Inventory System supports several Vision AI providers for image analy
 
 Edit `backend/.env` to choose your provider:
 
-### Option 1: OpenClaw gateway (default)
+### Option 1: Hermes (default)
 
 ```bash
-VISION_PROVIDER=openclaw
-OPENCLAW_VISION_URL=http://localhost:18790/analyze
-OPENCLAW_GATEWAY_TOKEN=your-gateway-token
-OPENCLAW_VISION_MODEL=openai/gpt-4o-mini
+VISION_PROVIDER=hermes
+HERMES_VISION_URL=http://localhost:18790/analyze   # optional — agent's OpenAI-compatible endpoint
+HERMES_API_KEY=your-key-here
+HERMES_MODEL=gpt-4-vision-preview
 ```
+
+Leave `HERMES_VISION_URL` unset to use the OpenAI API directly with `HERMES_API_KEY`.
 
 ### Option 2: OpenAI
 
@@ -63,10 +65,10 @@ print(f"Found {len(result.items)} items")
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `VISION_PROVIDER` | Provider to use (`openclaw`, `openai`, `nvidia`, `ollama`, `mock`) | `openclaw` |
-| `OPENCLAW_VISION_URL` | OpenClaw gateway URL | `http://localhost:18790/analyze` |
-| `OPENCLAW_GATEWAY_TOKEN` | OpenClaw gateway token (or `OPENCLAW_GATEWAY_TOKEN_FILE`) | - |
-| `OPENCLAW_VISION_MODEL` | Model routed through the gateway | `openai/gpt-5.4-mini` |
+| `VISION_PROVIDER` | Provider to use (`hermes`, `openai`, `nvidia`, `ollama`, `mock`) | `hermes` |
+| `HERMES_VISION_URL` | Hermes agent's OpenAI-compatible vision endpoint | unset (use OpenAI API) |
+| `HERMES_API_KEY` | Key for the Hermes/OpenAI endpoint (falls back to `OPENAI_API_KEY`) | - |
+| `HERMES_MODEL` | Vision model name | `gpt-4-vision-preview` |
 | `OPENAI_API_KEY` | OpenAI API key | - |
 | `OPENAI_MODEL` | OpenAI model name | `gpt-5` |
 | `NVIDIA_NIM_API_KEY` | NVIDIA NIM API key | - |

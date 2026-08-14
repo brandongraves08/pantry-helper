@@ -67,6 +67,8 @@ class InventoryItem(Base):
     package_type = Column(String, nullable=True)
     category = Column(String, nullable=True)
     unit = Column(String, nullable=True)
+    rating = Column(Float, nullable=True)  # 1-5, user rating for this item/brand
+    is_favorite = Column(Boolean, nullable=False, default=False)
     image_path = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
@@ -326,6 +328,8 @@ class Recipe(Base):
     prep_time_min = Column(Integer, nullable=True)
     cook_time_min = Column(Integer, nullable=True)
     instructions = Column(Text, nullable=True)
+    rating = Column(Float, nullable=True)  # 1-5, user rating
+    is_favorite = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

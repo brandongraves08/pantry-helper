@@ -50,6 +50,8 @@ async def get_inventory(
             par_level=getattr(state, "par_level", None),
             is_manual=state.is_manual,
             notes=state.notes,
+            rating=getattr(state.item, "rating", None),
+            is_favorite=bool(getattr(state.item, "is_favorite", False)),
             image_url=f"/v1/inventory/{state.item.id}/image" if state.item.image_path else None,
         )
         for state in states
@@ -110,6 +112,14 @@ async def override_inventory(
                 state.opened_at = override.opened_at
             if override.par_level is not None:
                 state.par_level = override.par_level
+
+        # Brand / rating / favorite live on the inventory item (not the state row)
+        if override.brand is not None:
+            item.brand = override.brand
+        if override.rating is not None:
+            item.rating = override.rating
+        if override.is_favorite is not None:
+            item.is_favorite = override.is_favorite
 
         db.commit()
 

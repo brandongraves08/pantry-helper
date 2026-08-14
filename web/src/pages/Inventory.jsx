@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Package, Search, Filter, Plus, ArrowUpDown, AlertTriangle, Apple, X, Check, Loader, Pencil, MapPin } from 'lucide-react';
+import { Package, Search, Filter, Plus, ArrowUpDown, AlertTriangle, Apple, X, Check, Loader, Pencil, MapPin, Star, Heart } from 'lucide-react';
 import * as api from '../api/client';
 
 export default function Inventory() {
@@ -42,6 +42,8 @@ export default function Inventory() {
         item_id: item.item_id,
         name: item.canonical_name || 'Unknown',
         brand: item.brand || null,
+        rating: item.rating || null,
+        is_favorite: item.is_favorite || false,
         category: item.category || 'Uncategorized',
         package_type: item.package_type || 'other',
         count: item.count_estimate || 0,
@@ -98,6 +100,9 @@ export default function Inventory() {
       par_level: item.par_level,
       location: item.location || '',
       notes: item.notes || '',
+      brand: item.brand || '',
+      rating: item.rating || null,
+      is_favorite: item.is_favorite || false,
     });
     setItemError('');
     setItemSuccess('');
@@ -126,6 +131,9 @@ export default function Inventory() {
         par_level: editForm.par_level === '' ? null : Math.max(0, Number(editForm.par_level) || 0),
         location: editForm.location.trim() || null,
         notes: editForm.notes.trim() || null,
+        brand: editForm.brand?.trim() || null,
+        rating: editForm.rating || null,
+        is_favorite: editForm.is_favorite || false,
       });
       setItemSuccess('Saved.');
       await loadInventory();
@@ -133,6 +141,42 @@ export default function Inventory() {
     } catch (err) {
       setItemError(err?.response?.data?.detail || 'Failed to save item.');
       setSavingItem(false);
+    }
+  };
+
+  const handleQuickRate = async (item, rating) => {
+    try {
+      await api.overrideInventory({
+        item_name: item.name,
+        count_estimate: item.count,
+        par_level: item.par_level,
+        location: item.location || null,
+        notes: item.notes || null,
+        brand: item.brand || null,
+        rating: item.rating === rating ? null : rating,
+        is_favorite: item.is_favorite || false,
+      });
+      await loadInventory();
+    } catch (err) {
+      console.error('Failed to rate item:', err);
+    }
+  };
+
+  const handleQuickFavorite = async (item) => {
+    try {
+      await api.overrideInventory({
+        item_name: item.name,
+        count_estimate: item.count,
+        par_level: item.par_level,
+        location: item.location || null,
+        notes: item.notes || null,
+        brand: item.brand || null,
+        rating: item.rating || null,
+        is_favorite: !item.is_favorite,
+      });
+      await loadInventory();
+    } catch (err) {
+      console.error('Failed to favorite item:', err);
     }
   };
 
@@ -326,10 +370,33 @@ export default function Inventory() {
                         {!item.image_url && <Package size={20} className="text-gray-500" />}
                       </div>
                       <div className="min-w-0">
-                        <p className="font-medium text-gray-900 truncate">{item.name}</p>
-                        {item.brand && (
-                          <p className="text-sm text-gray-500 truncate">{item.brand}</p>
-                        )}
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-gray-900 truncate">{item.name}</p>
+                          <button
+                            onClick={() => handleQuickFavorite(item)}
+                            className={`shrink-0 ${item.is_favorite ? 'text-pink-500' : 'text-gray-300 hover:text-pink-400'}`}
+                            aria-label={item.is_favorite ? 'Unfavorite' : 'Favorite'}
+                          >
+                            <Heart size={14} fill={item.is_favorite ? 'currentColor' : 'none'} />
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {item.brand && (
+                            <p className="text-sm text-gray-500 truncate">{item.brand}</p>
+                          )}
+                          <span className="flex items-center gap-0.5 shrink-0">
+                            {[1, 2, 3, 4, 5].map((n) => (
+                              <button
+                                key={n}
+                                onClick={() => handleQuickRate(item, n)}
+                                className={item.rating >= n ? 'text-amber-400' : 'text-gray-300 hover:text-amber-300'}
+                                aria-label={`Rate ${n} stars`}
+                              >
+                                <Star size={12} fill={item.rating >= n ? 'currentColor' : 'none'} />
+                              </button>
+                            ))}
+                          </span>
+                        </div>
                         {item.location && (
                           <p className="text-xs text-gray-400 flex items-center gap-1"><MapPin size={10} /> {item.location}</p>
                         )}
@@ -577,6 +644,46 @@ export default function Inventory() {
                     className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Brand</label>
+                <input
+                  type="text"
+                  value={editForm.brand || ''}
+                  onChange={handleEditField('brand')}
+                  placeholder="e.g. H-E-B, Del Monte"
+                  className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Rating</label>
+                  <span className="flex items-center gap-0.5">
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => setEditForm((f) => ({ ...f, rating: f.rating === n ? null : n }))}
+                        className={`${editForm.rating >= n ? 'text-amber-400' : 'text-gray-300 hover:text-amber-300'}`}
+                        aria-label={`Rate ${n} stars`}
+                      >
+                        <Star size={16} fill={editForm.rating >= n ? 'currentColor' : 'none'} />
+                      </button>
+                    ))}
+                  </span>
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={editForm.is_favorite || false}
+                    onChange={(e) => setEditForm((f) => ({ ...f, is_favorite: e.target.checked }))}
+                    className="h-4 w-4 rounded border-gray-300"
+                  />
+                  <span className="flex items-center gap-1 text-sm text-gray-700">
+                    <Heart size={14} className={editForm.is_favorite ? 'text-pink-500' : 'text-gray-400'} fill={editForm.is_favorite ? 'currentColor' : 'none'} />
+                    Favorite
+                  </span>
+                </label>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
