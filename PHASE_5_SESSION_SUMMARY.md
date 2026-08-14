@@ -156,7 +156,7 @@ Phase 2: Backend Foundation                ✅ COMPLETE
   └─ FastAPI, Database models, Authentication
 
 Phase 3: Image Processing                  ✅ COMPLETE
-  └─ OpenAI/Gemini Vision, Celery workers, Inventory logic
+  └─ OpenAI/vision provider Vision, Celery workers, Inventory logic
 
 Phase 4: ESP32 Firmware                    ✅ COMPLETE (Previous Session)
   └─ Camera control, Power management, WiFi upload, Sensors

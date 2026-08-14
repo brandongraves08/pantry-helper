@@ -20,7 +20,7 @@ This starts:
 
 - Docker Engine 20.10+
 - Docker Compose 2.0+
-- Vision API key (OpenAI or Google Gemini)
+- Vision API key (OpenAI or other providers)
 
 ## Configuration
 
@@ -30,15 +30,15 @@ Create `.env` in the project root:
 
 ```bash
 # Vision Provider (choose one)
-VISION_PROVIDER=openai  # or 'gemini'
+VISION_PROVIDER=openai  # or 'vision provider'
 
 # OpenAI Configuration
 OPENAI_API_KEY=sk-your-key-here
 OPENAI_MODEL=gpt-4-vision-preview
 
-# Gemini Configuration (alternative)
-GEMINI_API_KEY=your-gemini-key-here
-GEMINI_MODEL=gemini-1.5-flash
+# vision provider Configuration (alternative)
+vision provider_API_KEY=your-vision provider-key-here
+vision provider_MODEL=vision provider-1.5-flash
 
 # Database
 DB_USER=pantry
@@ -141,12 +141,12 @@ OPENAI_API_KEY=sk-your-key-here
 docker-compose restart backend celery_worker
 ```
 
-### Switch to Gemini
+### Switch to vision provider
 
 ```bash
 # Update .env
-VISION_PROVIDER=gemini
-GEMINI_API_KEY=your-gemini-key-here
+VISION_PROVIDER=vision provider
+vision provider_API_KEY=your-vision provider-key-here
 
 # Restart affected services
 docker-compose restart backend celery_worker
@@ -256,7 +256,7 @@ docker-compose restart celery_worker
 
 ```bash
 # Check environment variables
-docker-compose exec backend env | grep -E 'VISION|OPENAI|GEMINI'
+docker-compose exec backend env | grep -E 'VISION|OPENAI|vision provider'
 
 # Test vision provider (OpenAI)
 docker-compose exec backend python -c "
@@ -376,11 +376,11 @@ nginx:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `VISION_PROVIDER` | `openai` | Vision API provider (`openai` or `gemini`) |
+| `VISION_PROVIDER` | `openai` | Vision API provider (`openai` or `vision provider`) |
 | `OPENAI_API_KEY` | - | OpenAI API key (required if using OpenAI) |
 | `OPENAI_MODEL` | `gpt-4-vision-preview` | OpenAI model name |
-| `GEMINI_API_KEY` | - | Google Gemini API key (required if using Gemini) |
-| `GEMINI_MODEL` | `gemini-1.5-flash` | Gemini model name |
+| `vision provider_API_KEY` | - | other providers API key (required if using vision provider) |
+| `vision provider_MODEL` | `vision provider-1.5-flash` | vision provider model name |
 | `DATABASE_URL` | Auto-configured | PostgreSQL connection string |
 | `DB_USER` | `pantry` | Database username |
 | `DB_PASSWORD` | `pantry_secure_pass` | Database password |

@@ -6,9 +6,9 @@ Full project audit and remediation for Pantry Helper on LXC 202 (`192.168.1.100`
 
 ## Fixed
 
-- Removed Gemini runtime use:
-  - Removed `GEMINI_*` environment variables from Compose-managed containers.
-  - Removed Gemini provider code path from `backend/app/services/vision.py`.
+- Removed vision provider runtime use:
+  - Removed `vision provider_*` environment variables from Compose-managed containers.
+  - Removed vision provider provider code path from `backend/app/services/vision.py`.
   - Removed `google-generativeai` from `backend/requirements.txt`.
 - Prepared OpenAI vision path:
   - Kept OpenAI provider support and `OPENAI_MODEL=gpt-4o`.

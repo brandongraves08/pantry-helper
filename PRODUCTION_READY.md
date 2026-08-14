@@ -205,7 +205,7 @@ Visit http://pantry.local:5555 for Flower dashboard
 **Solution:** Check WiFi credentials, verify device token, check API endpoint
 
 **Issue:** Images not processing  
-**Solution:** Check Celery worker logs, verify Gemini API key, check worker status
+**Solution:** Check Celery worker logs, verify vision provider API key, check worker status
 
 **Issue:** Database connection errors  
 **Solution:** Verify PostgreSQL is running, check credentials in .env.docker
@@ -234,7 +234,7 @@ docker compose restart
 ### v1.0.0 - Production Release (2026-01-19)
 - Initial production deployment
 - All core features implemented
-- Multi-provider vision support (OpenAI/Gemini)
+- Multi-provider vision support (OpenAI/vision provider)
 - ESP32 firmware ready
 - Web UI dashboard complete
 - Docker containerized deployment

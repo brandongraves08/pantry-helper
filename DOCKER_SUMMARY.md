@@ -15,13 +15,13 @@ Your pantry inventory system is **fully containerized** and ready to run with Do
 
 ### Multi-Provider Vision AI
 
-Both OpenAI and Google Gemini are supported via environment configuration:
+Both OpenAI and other providers are supported via environment configuration:
 
 ```yaml
 # In docker-compose.yml
 VISION_PROVIDER: ${VISION_PROVIDER:-openai}
 OPENAI_API_KEY: ${OPENAI_API_KEY}
-GEMINI_API_KEY: ${GEMINI_API_KEY}
+vision provider_API_KEY: ${vision provider_API_KEY}
 ```
 
 ## 📋 Files Created/Updated
@@ -32,7 +32,7 @@ GEMINI_API_KEY: ${GEMINI_API_KEY}
 - `.env.docker.example` - Environment template for Docker
 
 ### Updated Files
-- `docker-compose.yml` - Added multi-provider support (VISION_PROVIDER, GEMINI_*)
+- `docker-compose.yml` - Added multi-provider support (VISION_PROVIDER, vision provider_*)
 - `Makefile` - Added docker-* commands
 - `README.md` - Added Docker quick start section
 
@@ -63,7 +63,7 @@ cd pantry-helper
 
 # 2. Configure environment
 cp .env.docker.example .env
-nano .env  # Add your OPENAI_API_KEY or GEMINI_API_KEY
+nano .env  # Add your OPENAI_API_KEY or vision provider_API_KEY
 
 # 3. Start all services
 docker-compose up -d
@@ -83,9 +83,9 @@ docker-compose exec backend python scripts/seed_db.py seed
 No code rebuild needed - just update `.env` and restart:
 
 ```bash
-# Switch to Gemini
-echo "VISION_PROVIDER=gemini" > .env
-echo "GEMINI_API_KEY=your-key" >> .env
+# Switch to vision provider
+echo "VISION_PROVIDER=vision provider" > .env
+echo "vision provider_API_KEY=your-key" >> .env
 docker-compose restart backend celery_worker
 
 # Switch to OpenAI
@@ -119,7 +119,7 @@ docker-compose restart backend celery_worker
                                ▼
                     ┌──────────────────┐
                     │  Vision AI API   │
-                    │ OpenAI / Gemini  │
+                    │ OpenAI / vision provider  │
                     └──────────────────┘
 ```
 

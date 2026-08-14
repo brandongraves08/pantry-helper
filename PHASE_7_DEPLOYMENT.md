@@ -11,7 +11,7 @@
 ### Prerequisites
 - Docker Engine 20.10+ (✓ installed)
 - Docker Compose v2+ (✓ v5.0.1)
-- Vision API key (OpenAI or Gemini)
+- Vision API key (OpenAI or vision provider)
 
 ### Quick Start (Recommended)
 

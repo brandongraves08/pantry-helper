@@ -28,7 +28,7 @@ A **production-ready, battery-powered pantry inventory system** using ESP32 came
 
 ✅ Phase 2: Vision & Services (Complete)
    - OpenAI GPT-4 Vision integration
-   - Google Gemini Vision support (multi-provider)
+   - other providers Vision support (multi-provider)
    - Image processing pipeline
    - Inventory delta calculation
    - Status: Both providers working
@@ -140,7 +140,7 @@ BACKEND TIER:
 │                            ↓                                 │
 │  Vision Service                                              │
 │  ├─ OpenAI GPT-4 Vision (primary)                            │
-│  └─ Google Gemini (fallback)                                 │
+│  └─ other providers (fallback)                                 │
 │                            ↓                                 │
 │  Database (PostgreSQL/SQLite)                                │
 │  ├─ Captures (raw images + metadata)                         │
@@ -343,8 +343,8 @@ State {
 DATABASE_URL=postgresql://user:pass@localhost:5432/pantry_db
 REDIS_URL=redis://localhost:6379/0
 OPENAI_API_KEY=sk-...
-VISION_PROVIDER=openai|gemini
-GEMINI_API_KEY=...
+VISION_PROVIDER=openai|vision provider
+vision provider_API_KEY=...
 LOG_LEVEL=INFO
 DEBUG=false
 ```

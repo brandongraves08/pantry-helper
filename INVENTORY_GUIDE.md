@@ -142,7 +142,7 @@ Manual entries always have **100% confidence** since you entered them directly.
 
 The inventory system works with the image upload feature:
 
-1. **Upload Image**: Pantry Helper analyzes the image with Gemini Vision
+1. **Upload Image**: Pantry Helper analyzes the image with vision provider Vision
 2. **Automatic Detection**: Found items appear automatically with vision confidence
 3. **Manual Override**: Use the Add/Update panel to adjust AI-detected counts
 4. **Hybrid Approach**: Mix AI detection with manual corrections

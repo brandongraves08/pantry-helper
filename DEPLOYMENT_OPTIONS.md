@@ -259,7 +259,7 @@ make web-dev            # Start web UI
 - **Contributing code?** → Local for dev, Docker for testing
 - **Deploying to Raspberry Pi/server?** → Docker only
 
-Both methods support **multi-provider vision AI** (OpenAI/Gemini) with no code changes.
+Both methods support **multi-provider vision AI** (OpenAI/vision provider) with no code changes.
 
 ---
 

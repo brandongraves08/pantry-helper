@@ -46,9 +46,9 @@
 
 ### .env Settings
 ```bash
-VISION_PROVIDER=gemini
-GEMINI_API_KEY=AIzaSy[REDACTED]
-GEMINI_MODEL=gemini-1.5-flash
+VISION_PROVIDER=vision provider
+vision provider_API_KEY=AIzaSy[REDACTED]
+vision provider_MODEL=vision provider-1.5-flash
 ```
 
 ### Docker Daemon Config
@@ -115,7 +115,7 @@ curl http://localhost:8000/health
 
 1. **Test Image Upload** - Use Web UI to upload pantry image
 2. **Monitor Processing** - Check Celery tasks at http://127.0.0.1:5555
-3. **Verify Gemini Integration** - Confirm vision analysis working
+3. **Verify vision provider Integration** - Confirm vision analysis working
 4. **Configure Device** - Set up ESP32 with API endpoint
 5. **Production Deployment** - Use Kubernetes or cloud platform
 
@@ -133,7 +133,7 @@ curl http://localhost:8000/health
 │  [ESP32]────┘           │                       │
 │  (Camera)               ├──→[Redis:6379]        │
 │                         │   └──→[Celery Worker] │
-│                         │       └──→[Gemini]    │
+│                         │       └──→[vision provider]    │
 │                         │                       │
 │                         └──→[Flower:5555]       │
 │                             (Monitoring)        │
@@ -163,7 +163,7 @@ curl http://localhost:8000/health
 1. `/etc/docker/daemon.json` - Fixed iptables configuration
 2. `backend/app/api/routes/admin.py` - Fixed syntax errors and imports
 3. `docker-compose.yml` - Corrected web port mapping (already in repo)
-4. `.env` - Added Gemini API key
+4. `.env` - Added vision provider API key
 
 ---
 

@@ -64,13 +64,13 @@ make web-dev                              # UI at :5173
 - Check status via `/v1/captures/{capture_id}` (see [backend/app/api/routes/inventory.py](../backend/app/api/routes/inventory.py))
 
 **Vision API integration:**
-- Supports both OpenAI GPT-4 Vision and Google Gemini
-- Provider selected via `VISION_PROVIDER` env var (`openai` or `gemini`)
-- Model: `gpt-4-vision-preview` (OpenAI) or `gemini-1.5-flash` (Gemini), configurable in [backend/app/config.py](../backend/app/config.py)
+- Multiple providers: OpenClaw gateway (default), OpenAI, NVIDIA NIM, Ollama, mock
+- Provider selected via `VISION_PROVIDER` env var (`openclaw`, `openai`, `nvidia`, `ollama`, `mock`)
+- Model: `gpt-5` (OpenAI), `openai/gpt-5.4-mini` (OpenClaw default), `moonshotai/kimi-k2.5` (NVIDIA), `llava:latest` (Ollama) — configurable in [backend/app/config.py](../backend/app/config.py)
 - Multi-provider implementation in [backend/app/services/vision.py](../backend/app/services/vision.py)
 - Prompt in `VisionAnalyzer._build_prompt()` expects JSON response: `{"scene_confidence": 0.85, "items": [{"name": "...", "count": 2, "confidence": 0.9}]}`
-- Images base64-encoded (OpenAI) or PIL Image object (Gemini)
-- Markdown code block parsing for both providers
+- Images base64-encoded and sent to the provider endpoint
+- Markdown code block parsing for all providers
 
 **Database UUIDs:**
 - All models use `uuid.uuid4()` string IDs, not auto-increment

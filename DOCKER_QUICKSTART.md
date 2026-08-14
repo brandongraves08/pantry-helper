@@ -70,11 +70,11 @@ OPENAI_API_KEY=sk-your-key-here
 docker-compose restart backend celery_worker
 ```
 
-### Use Gemini
+### Use vision provider
 ```bash
 # Edit .env
-VISION_PROVIDER=gemini
-GEMINI_API_KEY=your-gemini-key-here
+VISION_PROVIDER=vision provider
+vision provider_API_KEY=your-vision provider-key-here
 
 # Restart
 docker-compose restart backend celery_worker

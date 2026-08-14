@@ -81,7 +81,7 @@
 
 ### Phase 3: Image Processing ✅
 - OpenAI Vision API integration
-- Google Gemini Vision fallback
+- other providers Vision fallback
 - Celery background workers
 - Inventory state machine
 
@@ -308,7 +308,7 @@ curl http://localhost:8000/v1/inventory/stats
 - **Microcontroller**: ESP32-CAM with OV2640
 - **Backend**: FastAPI, SQLAlchemy, PostgreSQL
 - **Job Queue**: Celery + Redis
-- **Vision AI**: OpenAI GPT-4 Vision + Google Gemini
+- **Vision AI**: OpenAI GPT-4 Vision + other providers
 - **Frontend**: React 18.2 + Vite + Tailwind
 - **Containerization**: Docker Compose
 - **Database**: PostgreSQL (prod) / SQLite (dev)

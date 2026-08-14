@@ -7,7 +7,7 @@
 
 ## 📊 Quick Overview
 
-The Pantry Inventory System is a battery-powered, event-driven pantry monitoring solution using ESP32 camera hardware, multi-provider AI vision (OpenAI GPT-4 Vision or Google Gemini) for image analysis, and a FastAPI backend with React dashboard.
+The Pantry Inventory System is a battery-powered, event-driven pantry monitoring solution using ESP32 camera hardware, multi-provider AI vision (OpenAI GPT-4 Vision or a self-hosted provider) for image analysis, and a FastAPI backend with React dashboard.
 
 ### System Components
 
@@ -15,7 +15,7 @@ The Pantry Inventory System is a battery-powered, event-driven pantry monitoring
 |-----------|--------|-------------|
 | **Backend API** | ✅ Complete | FastAPI with SQLAlchemy, JWT auth, Celery workers |
 | **Database** | ✅ Complete | PostgreSQL/SQLite with Alembic migrations |
-| **Vision AI** | ✅ Complete | Multi-provider: OpenAI GPT-4 Vision & Google Gemini |
+| **Vision AI** | ✅ Complete | Multi-provider: OpenAI GPT-4 Vision & other providers |
 | **Job Queue** | ✅ Complete | Celery + Redis for async processing |
 | **Web UI** | ✅ Complete | React + Vite dashboard with charts |
 | **Firmware** | ⚠️ Stub | ESP32 code structure (needs implementation) |
@@ -31,7 +31,7 @@ The Pantry Inventory System is a battery-powered, event-driven pantry monitoring
 - [x] Image ingestion API (`POST /v1/ingest`)
 - [x] Inventory management API (`GET /v1/inventory`)
 - [x] Admin endpoints for device management
-- [x] Multi-provider Vision AI (OpenAI GPT-4 Vision + Google Gemini)
+- [x] Multi-provider Vision AI (OpenAI GPT-4 Vision + other providers)
 - [x] Automatic provider selection via environment variables
 - [x] Celery background workers for image processing
 - [x] Database models: Device → Capture → Observation → Inventory
@@ -76,9 +76,9 @@ Vision AI provider
 echo "VISION_PROVIDER=openai" >> backend/.env
 echo "OPENAI_API_KEY=sk-your-key-here" >> backend/.env
 
-# OR for Google Gemini (free tier available):
-echo "VISION_PROVIDER=gemini" >> backend/.env
-echo "GEMINI_API_KEY=your-gemini-key
+# OR for other providers (free tier available):
+echo "VISION_PROVIDER=vision provider" >> backend/.env
+echo "vision provider_API_KEY=your-vision provider-key
 echo "OPENAI_API_KEY=sk-your-key-here" >> backend/.env
 
 # 4. Start backend (terminal 1)

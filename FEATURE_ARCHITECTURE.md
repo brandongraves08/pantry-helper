@@ -39,7 +39,7 @@
 | Provider | Status | Model | Issue |
 |----------|--------|-------|-------|
 | OpenAI | 🔴 Quota Exceeded | gpt-5 | insufficient_quota |
-| Gemini | 🔴 Quota Exceeded | gemini-2.0-flash | free_tier_requests limit 0 |
+| vision provider | 🔴 Quota Exceeded | vision provider-2.0-flash | free_tier_requests limit 0 |
 | Ollama (Local) | ⏳ Not Enabled | llava | Can add later |
 
 ---
@@ -163,7 +163,7 @@ models = [
 metrics = ["response_time", "items_detected", "accuracy_score", "cost"]
 ```
 
-**Current Status:** Only NVIDIA models available (OpenAI/Gemini blocked)
+**Current Status:** Only NVIDIA models available (OpenAI/vision provider blocked)
 
 ---
 
@@ -208,7 +208,7 @@ A deep, end-to-end review of the pantry-helper project to surface issues (bugs, 
 9. ⏳ **Full Pantry Project Audit** - Deep review of the pantry project for issues & enhancements (see "Full Project Audit" section below)
 
 ### P2 - Enhanced Experience
-10. ⏳ **Model Comparison Tests** - Need OpenAI/Gemini credits
+10. ⏳ **Model Comparison Tests** - Need OpenAI/vision provider credits
 11. ⏳ **ML Accuracy Metrics** - Track detection quality over time
 12. ⏳ **RTSP Camera Support** - For network cameras
 13. ⏳ **Mobile Notifications** - Pushover integration

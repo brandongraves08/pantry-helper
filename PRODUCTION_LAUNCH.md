@@ -179,7 +179,7 @@ docker compose exec db pg_dump -U pantry pantry_production > \
 
 1. **WiFi Credentials:** Must be configured in firmware before upload
 2. **Device Tokens:** Each ESP32 needs unique device_id and token
-3. **Vision API:** Gemini API key configured (AIzaSy[REDACTED])
+3. **Vision API:** vision provider API key configured (AIzaSy[REDACTED])
 4. **Backups:** Set up automated daily backups
 5. **Monitoring:** Check Flower dashboard regularly
 
@@ -211,7 +211,7 @@ docker compose logs -f
 
 **Images not processing:**
 - Check Celery worker status
-- Verify Gemini API key
+- Verify vision provider API key
 - Check worker logs for errors
 
 **Database issues:**
