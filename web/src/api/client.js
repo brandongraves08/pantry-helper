@@ -257,4 +257,45 @@ export const getRecipeShoppingNeeds = async (id) => {
   return data
 }
 
+// Meal Plans API
+export const listMealPlans = async () => {
+  const { data } = await apiClient.get('/v1/meal-plans')
+  return data
+}
+
+export const getMealPlan = async (id) => {
+  const { data } = await apiClient.get(`/v1/meal-plans/${id}`)
+  return data
+}
+
+export const createMealPlan = async (payload) => {
+  const { data } = await apiClient.post('/v1/meal-plans', payload)
+  return data
+}
+
+export const deleteMealPlan = async (id) => {
+  const { data } = await apiClient.delete(`/v1/meal-plans/${id}`)
+  return data
+}
+
+export const addMealPlanEntry = async (planId, payload) => {
+  const { data } = await apiClient.post(`/v1/meal-plans/${planId}/entries`, payload)
+  return data
+}
+
+export const deleteMealPlanEntry = async (entryId) => {
+  const { data } = await apiClient.delete(`/v1/meal-plans/entries/${entryId}`)
+  return data
+}
+
+export const verifyMealPlan = async (planId, params = {}) => {
+  const { data } = await apiClient.get(`/v1/meal-plans/${planId}/verify`, { params })
+  return data
+}
+
+export const updateShoppingFromPlan = async (planId, params = {}) => {
+  const { data } = await apiClient.post(`/v1/meal-plans/${planId}/update-shopping`, null, { params })
+  return data
+}
+
 export default apiClient
