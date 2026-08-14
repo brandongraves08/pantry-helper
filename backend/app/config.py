@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     # OpenClaw Gateway Configuration
     OPENCLAW_VISION_URL: str = os.getenv(
         "OPENCLAW_VISION_URL",
-        "http://172.16.1.1:18790/analyze",
+        "http://localhost:18790/analyze",
     )
     OPENCLAW_GATEWAY_TOKEN: Optional[str] = os.getenv("OPENCLAW_GATEWAY_TOKEN")
     OPENCLAW_GATEWAY_TOKEN_FILE: Optional[str] = os.getenv("OPENCLAW_GATEWAY_TOKEN_FILE")
@@ -52,6 +52,17 @@ class Settings(BaseSettings):
     # Set PANTRY_API_TOKEN in the environment/.env. If not set, writes are
     # allowed (dev mode) so existing setups don't break; production should set it.
     PANTRY_API_TOKEN: Optional[str] = os.getenv("PANTRY_API_TOKEN")
+
+    # Allowed CORS origins (comma-separated in env). Localhost defaults are safe
+    # for local dev; set CORS_ORIGINS to your deployed web origin in production.
+    CORS_ORIGINS: list = [
+        o.strip()
+        for o in os.getenv(
+            "CORS_ORIGINS",
+            "http://localhost:3000,http://127.0.0.1:3000",
+        ).split(",")
+        if o.strip()
+    ]
 
     # Job Queue Configuration
     CELERY_BROKER_URL: str = os.getenv(

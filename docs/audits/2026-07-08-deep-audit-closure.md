@@ -2,7 +2,7 @@
 
 ## Scope
 
-Full project audit and remediation for Pantry Helper on LXC 202 (`192.168.2.202`): Docker stack, secrets/provider config, deployment hygiene, service health, backups, monitoring, host hardening, NetBox, and shared-drive standing order.
+Full project audit and remediation for Pantry Helper on LXC 202 (`192.168.1.100`): Docker stack, secrets/provider config, deployment hygiene, service health, backups, monitoring, host hardening, NetBox, and shared-drive standing order.
 
 ## Fixed
 
@@ -37,7 +37,7 @@ Full project audit and remediation for Pantry Helper on LXC 202 (`192.168.2.202`
   - Validated Nagios config and restarted `nagios-core`.
 - NetBox:
   - Confirmed `pantry-helper` device record exists.
-  - Added `eth0`, assigned `192.168.2.202/24`, and set it as primary IPv4.
+  - Added `eth0`, assigned `192.168.1.100/24`, and set it as primary IPv4.
 
 ## Verified Snapshot
 
@@ -49,13 +49,13 @@ Full project audit and remediation for Pantry Helper on LXC 202 (`192.168.2.202`
 - `pantry-redis`: healthy, Docker-network-only `6379/tcp`.
 - `pantry-promtail`: running.
 - Nagios pre-flight: 0 warnings, 0 errors.
-- NetBox primary IP: `192.168.2.202/24`.
+- NetBox primary IP: `192.168.1.100/24`.
 - `apt list --upgradable`: no pending package list beyond header.
 
 ## Remaining Blocker
 
 - Synology shared drive is not mounted in LXC 202.
-- Attempted NFS mount: `media-server.thelab.lan:/volume1/Shared` to `/mnt/synology-shared`.
+- Attempted NFS mount: `media-server.local.lan:/volume1/Shared` to `/mnt/synology-shared`.
 - Result: `mount.nfs: Operation not permitted`.
 - Reason: LXC 202 is unprivileged; direct NFS mount requires host-side bind mount or container privilege/capability changes.
 - Next safe fix: mount the Synology share on `proxmox-02` and bind-mount it into LXC 202 during a maintenance restart.

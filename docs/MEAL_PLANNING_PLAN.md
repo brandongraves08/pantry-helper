@@ -1,7 +1,7 @@
 # Meal Planning Feature — Audit + Implementation Plan
 
 **Date:** 2026-08-14
-**Repo:** brandongraves08/pantry-helper (CT202, live)
+**Repo:** brandongraves08/pantry-helper (server, live)
 **Audit basis:** live API (`/v1/openapi.json`), live DB data, repo `main` @ 4c10ad4, `FEATURE_ARCHITECTURE.md`
 
 ---
@@ -34,7 +34,7 @@
 - **Quantity is a free-text string** (`"1½ lb"`, `"½ cup"`, `"4 slices"`) vs inventory `count_estimate` integer. Verification must decide: count-based items compare counts; weight/volume items need a "units per use" heuristic.
 - **Live shopping list has duplicate canonical names** (e.g. 3 Black Beans rows, Bush's beans ×2) — multiple `inventory_items` share a canonical name. The merge must dedupe by canonical name or it'll double-order.
 - **Confidence matters.** 41/54 live inventory items sit at 0.30 confidence (unverified photo stocktake). Verification should respect `min_confidence` (0.5 default, same as low-stock) or the plan will claim "have it" on unconfirmed counts.
-- **Deploy gotchas (known):** new tables → `create_all` races alembic → `alembic stamp 007`; CT202 pulls need the token URL; always verify the running container actually has your code (`docker exec pantry-api grep`); preserve CT202 local compose mods.
+- **Deploy gotchas (known):** new tables → `create_all` races alembic → `alembic stamp 007`; server pulls need the token URL; always verify the running container actually has your code (`docker exec pantry-api grep`); preserve server local compose mods.
 
 ---
 
@@ -110,7 +110,7 @@ One `MealPlan` per week (Mon–Sun) keeps it simple; entries carry the actual da
 2. `meal_plans.py` router: CRUD + entries + `verify` + `update-shopping`.
 3. Schemas in `schemas.py` (MealPlan, MealPlanEntry, MealPlanVerifyResponse, MealPlanItemNeed).
 4. Wire router in `main.py`; py_compile + throwaway-venv import test.
-5. Deploy to CT202 (token-URL pull, build backend, verify container has symbols).
+5. Deploy to server (token-URL pull, build backend, verify container has symbols).
 
 ### Phase 2 — Web UI
 6. `MealPlans.jsx` week planner + verify badges + "add to HEB" button; `client.js` API fns; nav route.

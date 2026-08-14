@@ -58,7 +58,7 @@ services:
       CELERY_RESULT_BACKEND: redis://redis:6379/0
       STORAGE_PATH: /data/storage
       VISION_PROVIDER: ${VISION_PROVIDER:-openclaw}
-      OPENCLAW_VISION_URL: ${OPENCLAW_VISION_URL:-http://172.16.1.1:18790/analyze}
+      OPENCLAW_VISION_URL: ${OPENCLAW_VISION_URL:-http://localhost:18790/analyze}
       OPENCLAW_GATEWAY_TOKEN_FILE: ${OPENCLAW_GATEWAY_TOKEN_FILE:-/run/secrets/openclaw_gateway_token}
       OPENCLAW_VISION_MODEL: ${OPENCLAW_VISION_MODEL:-openai/gpt-5.4-mini}
       OPENCLAW_TIMEOUT: ${OPENCLAW_TIMEOUT:-120}
@@ -107,7 +107,7 @@ services:
       CELERY_RESULT_BACKEND: redis://redis:6379/0
       STORAGE_PATH: /data/storage
       VISION_PROVIDER: ${VISION_PROVIDER:-openclaw}
-      OPENCLAW_VISION_URL: ${OPENCLAW_VISION_URL:-http://172.16.1.1:18790/analyze}
+      OPENCLAW_VISION_URL: ${OPENCLAW_VISION_URL:-http://localhost:18790/analyze}
       OPENCLAW_GATEWAY_TOKEN_FILE: ${OPENCLAW_GATEWAY_TOKEN_FILE:-/run/secrets/openclaw_gateway_token}
       OPENCLAW_VISION_MODEL: ${OPENCLAW_VISION_MODEL:-openai/gpt-5.4-mini}
       OPENCLAW_TIMEOUT: ${OPENCLAW_TIMEOUT:-120}
@@ -170,13 +170,13 @@ services:
       dockerfile: Dockerfile
       target: prod
       args:
-        VITE_API_URL: http://pantry-helper.thelab.lan:8000
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
         VITE_PANTRY_API_TOKEN: ${PANTRY_API_TOKEN:-}
     container_name: pantry-web
     ports:
       - "3000:80"
     environment:
-      VITE_API_URL: http://pantry-helper.thelab.lan:8000
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
     depends_on:
       - backend
     logging: *default-logging

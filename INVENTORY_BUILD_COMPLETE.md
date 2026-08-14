@@ -50,7 +50,7 @@ The inventory section of Pantry Helper is now fully built out and ready to use!
 
 ### Access the UI
 ```
-http://192.168.2.79:3000     (External IP)
+http://192.168.1.100:3000     (External IP)
 http://127.0.0.1:3000        (Localhost)
 ```
 
@@ -230,7 +230,7 @@ inventory_events
 
 ## 📞 Next Steps
 
-1. **Explore the UI**: Visit http://192.168.2.79:3000
+1. **Explore the UI**: Visit http://192.168.1.100:3000
 2. **Try Adding Items**: Use the form panel
 3. **Test Search/Sort**: Filter and organize
 4. **Read the Guide**: See INVENTORY_GUIDE.md

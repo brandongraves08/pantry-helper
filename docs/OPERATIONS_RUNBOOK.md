@@ -1,20 +1,20 @@
 # Pantry Helper — Operational Runbook
 
 > **Last Updated:** 2026-07-20
-> **Host:** proxmox-02 LXC 202 (192.168.2.202)
+> **Host:** proxmox-02 LXC 202 (192.168.1.100)
 > **Stack:** FastAPI + PostgreSQL + Celery + Redis + React (Docker Compose)
 
 ## Quick Reference Card
 
 ### 🖥️ Web UI
-- **Pantry Helper:** http://pantry-helper.thelab.lan:3000
-- **API Docs:** http://pantry-helper.thelab.lan:8000/docs
+- **Pantry Helper:** http://pantry.local:3000
+- **API Docs:** http://pantry.local:8000/docs
 
 ### 🐳 Service Management
 All services managed via Docker Compose. SSH into the LXC first:
 
 ```bash
-ssh openclaw@192.168.2.202
+ssh openclaw@192.168.1.100
 cd /home/brandon/pantry-helper
 ```
 
@@ -34,17 +34,17 @@ cd /home/brandon/pantry-helper
 ### 🔍 Health Checks
 | Check | URL |
 |-------|-----|
-| API health | http://pantry-helper.thelab.lan:8000/health |
-| Flower (Celery) | http://pantry-helper.thelab.lan:5555 |
-| PWA manifest | http://pantry-helper.thelab.lan:3000/manifest.webmanifest |
+| API health | http://pantry.local:8000/health |
+| Flower (Celery) | http://pantry.local:5555 |
+| PWA manifest | http://pantry.local:3000/manifest.webmanifest |
 
 ### 📊 Monitoring
-- **Nagios:** http://loki.thelab.lan:8080/nagios/ (5 checks for pantry-helper)
+- **Nagios:** http://loki.local:8080/nagios/ (5 checks for pantry-helper)
 - **Grafana Dashboard:** `/d/dfrpmw7636328d/pantry-helper-logs-and-health`
 - **PBS Backups:** Daily automatic backup of LXC 202
 
 ### 📸 For Family (Daily Use)
-1. Open Safari → `pantry-helper.thelab.lan:3000`
+1. Open Safari → `pantry.local:3000`
 2. Tap Share → **Add to Home Screen** (runs fullscreen like an app)
 3. Use **Scan Barcode** to add items by barcode
 4. Use **Review Queue** to approve items detected by the AI
@@ -85,7 +85,7 @@ cd /home/brandon/pantry-helper
 
 ### Checking Status
 ```bash
-ssh openclaw@192.168.2.202
+ssh openclaw@192.168.1.100
 cd /home/brandon/pantry-helper
 docker compose ps
 ```
@@ -157,7 +157,7 @@ After making changes to the source code:
 
 ### API Health Endpoint
 ```bash
-curl http://pantry-helper.thelab.lan:8000/health
+curl http://pantry.local:8000/health
 ```
 
 Expected response:
@@ -179,7 +179,7 @@ The endpoint returns:
 
 ### Web Health Check
 ```bash
-curl -s -o /dev/null -w "%{http_code}" http://pantry-helper.thelab.lan:3000/
+curl -s -o /dev/null -w "%{http_code}" http://pantry.local:3000/
 # Expected: 200
 ```
 
@@ -255,7 +255,7 @@ docker exec pantry-api cat /run/secrets/openclaw_gateway_token
 ### Web UI shows blank page
 ```bash
 # Check web container
-curl -s -o /dev/null -w "%{http_code}" http://pantry-helper.thelab.lan:3000/
+curl -s -o /dev/null -w "%{http_code}" http://pantry.local:3000/
 # Expected: 200
 
 # Check nginx error logs

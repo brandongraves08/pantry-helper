@@ -1,13 +1,13 @@
 # Pantry Helper — Roadmap
 
 > **Last Updated:** 2026-07-19
-> **Status:** 🟢 Production-deployed on LXC 202 (pantry-helper.thelab.lan)
+> **Status:** 🟢 Production-deployed on LXC 202 (pantry.local)
 > **Stack:** FastAPI + PostgreSQL + Celery + Redis + React (Docker Compose)
 
 ## ✅ Complete (Deployed & Operational)
 
 - **Docker Compose stack** — FastAPI backend, Celery worker, PostgreSQL, Redis, React web UI, Flower monitoring
-- **Production LXC deployment** — LXC 202 at 192.168.2.202, Docker Compose with production overrides
+- **Production LXC deployment** — LXC 202 at 192.168.1.100, Docker Compose with production overrides
 - **Vision analysis** — OpenClaw vision provider (`openai/gpt-5.4-mini`), working detection pipeline
 - **Background job queue** — Celery + Redis for async image analysis
 - **Device registration API** — Token-based device management
@@ -17,7 +17,7 @@
 - **Structured logging** — Across the entire stack
 - **Nagios monitoring** — 3 HTTP checks (API, Web, Flower) + 2 NCPA system checks (CPU, Memory)
 - **PBS backup** — Daily automatic backup of LXC 202
-- **Cloudflare ingress** — Traefik routes via `*.homelab.graveystudios.com` when mapped
+- **Cloudflare ingress** — Traefik routes via `*.homelab.local` when mapped
 
 ### Phase 1: Hardening & Infrastructure ✅ *(2026-07-10)*
 - [x] PBS backup configured and verified

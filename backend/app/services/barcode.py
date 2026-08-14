@@ -43,7 +43,7 @@ def lookup_barcode(barcode: str) -> BarcodeProduct:
     url = OPENFOODFACTS_URL.format(barcode=clean)
 
     headers = {
-        "User-Agent": "PantryHelper/1.0 (pantry-inventory-system; brandon@thelab.lan)",
+        "User-Agent": "PantryHelper/1.0 (pantry-inventory-system)",
         "Accept": "application/json",
     }
     try:

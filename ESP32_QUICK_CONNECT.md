@@ -13,7 +13,7 @@
 
 **Option A: Using curl (command line)**
 ```bash
-curl -X POST http://rhel-01.thelab.lan:8000/v1/admin/devices \
+curl -X POST http://pantry.local:8000/v1/admin/devices \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Kitchen Pantry Camera",
@@ -22,7 +22,7 @@ curl -X POST http://rhel-01.thelab.lan:8000/v1/admin/devices \
 ```
 
 **Option B: Using the API docs (browser)**
-1. Open: http://rhel-01.thelab.lan:8000/docs
+1. Open: http://pantry.local:8000/docs
 2. Find the `/v1/admin/devices` POST endpoint
 3. Click "Try it out"
 4. Enter:
@@ -61,7 +61,7 @@ void Config::_init_defaults() {
     strcpy(Config::settings.ssid, "YOUR_WIFI_SSID");              // Your WiFi network name
     strcpy(Config::settings.password, "YOUR_WIFI_PASSWORD");       // Your WiFi password
     strcpy(Config::settings.device_id, "pantry-cam-001");         // Same as registered above
-    strcpy(Config::settings.api_endpoint, "http://rhel-01.thelab.lan:8000/v1/ingest");
+    strcpy(Config::settings.api_endpoint, "http://pantry.local:8000/v1/ingest");
     strcpy(Config::settings.api_token, "YOUR_TOKEN_FROM_STEP_1"); // Token from registration
     // ⬆️ UPDATE THESE VALUES ⬆️
     
@@ -75,7 +75,7 @@ void Config::_init_defaults() {
 strcpy(Config::settings.ssid, "MyHomeWiFi");
 strcpy(Config::settings.password, "MySecurePassword123");
 strcpy(Config::settings.device_id, "pantry-cam-001");
-strcpy(Config::settings.api_endpoint, "http://rhel-01.thelab.lan:8000/v1/ingest");
+strcpy(Config::settings.api_endpoint, "http://pantry.local:8000/v1/ingest");
 strcpy(Config::settings.api_token, "iXQfmlnd6n7qO--qFqxd0AX7syxJZHdduZHs1VH-XWI");
 ```
 
@@ -172,7 +172,7 @@ python3 -m platformio device monitor
 
 [EVENT] Door trigger detected!
 [EVENT] ✓ Image captured: 45823 bytes
-[EVENT] Uploading to http://rhel-01.thelab.lan:8000/v1/ingest
+[EVENT] Uploading to http://pantry.local:8000/v1/ingest
 [EVENT] ✓ Upload successful!
 
 [SLEEP] Entering deep sleep mode...
@@ -184,7 +184,7 @@ python3 -m platformio device monitor
 
 **Check device status via API:**
 ```bash
-curl http://rhel-01.thelab.lan:8000/v1/devices
+curl http://pantry.local:8000/v1/devices
 ```
 
 **Expected Output:**
@@ -207,7 +207,7 @@ curl http://rhel-01.thelab.lan:8000/v1/devices
 ```
 
 **Check via Web Dashboard:**
-Open: http://rhel-01.thelab.lan:3000
+Open: http://pantry.local:3000
 
 You should see your device listed with:
 - Green "Active" status
@@ -235,17 +235,17 @@ python3 -m platformio device monitor
 **Check 2: API endpoint accessible**
 ```bash
 # From ESP32's network, test if API is reachable
-ping rhel-01.thelab.lan
+ping pantry.local
 
 # Test API endpoint
-curl http://rhel-01.thelab.lan:8000/health
+curl http://pantry.local:8000/health
 ```
-→ **Fix:** Ensure rhel-01.thelab.lan is accessible on your WiFi network
+→ **Fix:** Ensure pantry.local is accessible on your WiFi network
 
 **Check 3: Device token valid**
 ```bash
 # Verify device is registered
-curl http://rhel-01.thelab.lan:8000/v1/devices | python3 -m json.tool
+curl http://pantry.local:8000/v1/devices | python3 -m json.tool
 ```
 → **Fix:** Re-register device if needed (Step 1)
 
@@ -276,7 +276,7 @@ docker compose logs backend | grep -i "401\|403\|auth"
 **Test from ESP32's network:**
 ```bash
 # From a device on same WiFi as ESP32
-curl -v http://rhel-01.thelab.lan:8000/health
+curl -v http://pantry.local:8000/health
 ```
 
 ---
@@ -314,7 +314,7 @@ ERROR - Authentication failed for device pantry-cam-001
 
 ### Register Device
 ```bash
-curl -X POST http://rhel-01.thelab.lan:8000/v1/admin/devices \
+curl -X POST http://pantry.local:8000/v1/admin/devices \
   -H "Content-Type: application/json" \
   -d '{"name":"Kitchen Pantry","device_id":"pantry-cam-001"}'
 ```
@@ -336,12 +336,12 @@ python3 -m platformio device monitor
 
 ### Check Device Status
 ```bash
-curl http://rhel-01.thelab.lan:8000/v1/devices | python3 -m json.tool
+curl http://pantry.local:8000/v1/devices | python3 -m json.tool
 ```
 
 ### View Recent Captures
 ```bash
-curl http://rhel-01.thelab.lan:8000/v1/inventory/history | python3 -m json.tool
+curl http://pantry.local:8000/v1/inventory/history | python3 -m json.tool
 ```
 
 ---
@@ -350,7 +350,7 @@ curl http://rhel-01.thelab.lan:8000/v1/inventory/history | python3 -m json.tool
 
 1. ✅ Device registered and online
 2. ✅ First image captured and uploaded
-3. ⏳ Monitor inventory updates at http://rhel-01.thelab.lan:3000
+3. ⏳ Monitor inventory updates at http://pantry.local:3000
 4. ⏳ Adjust camera position for best pantry view
 5. ⏳ Test trigger reliability (door/light sensors)
 6. ⏳ Monitor battery life and charging
@@ -360,4 +360,4 @@ curl http://rhel-01.thelab.lan:8000/v1/inventory/history | python3 -m json.tool
 **Need Help?**
 - Check backend logs: `docker compose logs backend -f`
 - Check worker logs: `docker compose logs celery_worker -f`
-- View API docs: http://rhel-01.thelab.lan:8000/docs
+- View API docs: http://pantry.local:8000/docs

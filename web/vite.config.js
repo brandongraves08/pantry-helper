@@ -67,9 +67,8 @@ export default defineConfig({
   server: {
     port: 5173,
     allowedHosts: [
-      'pantry-helper.thelab.lan',
       'localhost',
-      '.thelab.lan',
+      '127.0.0.1',
     ],
     proxy: {
       '/health': {

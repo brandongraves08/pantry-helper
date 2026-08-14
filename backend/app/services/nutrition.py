@@ -47,7 +47,7 @@ def search_by_name(query: str, limit: int = 5) -> list[NutritionInfo]:
     }
 
     headers = {
-        "User-Agent": "PantryHelper/1.0 (pantry-inventory-system; brandon@thelab.lan)",
+        "User-Agent": "PantryHelper/1.0 (pantry-inventory-system)",
         "Accept": "application/json",
     }
 

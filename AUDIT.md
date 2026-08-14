@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-09
 **Scope:** Backend API, database, frontend, vision/ML, deploy/ops, data quality, docs.
-**Method:** Code review of `brandongraves08/pantry-helper` @ `9032876`, live DB/API inspection on CT202.
+**Method:** Code review of `brandongraves08/pantry-helper` @ `9032876`, live DB/API inspection on server.
 
 ---
 
@@ -18,12 +18,12 @@ Project is **functional** (core inventory + shopping + recipes all work, deploye
 - **Status:** ✅ RESOLVED 2026-08-09 — shared Bearer token (`PANTRY_API_TOKEN`) enforced on all write routes via `APIAuthMiddleware` (see P0-1 fix note).
 - **Where:** `backend/app/middleware/api_auth.py`
 - **Impact:** Anyone on the network can overwrite inventory, approve/reject reviews, add/delete recipes, register/delete devices, and hit admin process endpoints. The `agent` endpoints (used by Discord digest) are read-only, but write routes are wide open.
-- **Fix:** Require `get_current_device` (or a bearer token) on all write routes; keep read routes optionally open or token-gated. This is a homelab on 192.168.2.x, so blast radius is LAN-only — but LAN-only is still "trusts LAN, no auth" per existing setup note.
+- **Fix:** Require `get_current_device` (or a bearer token) on all write routes; keep read routes optionally open or token-gated. This is a LAN-only homelab, so blast radius is LAN-only — but LAN-only is still "trusts LAN, no auth" per existing setup note.
 
 ### P0-2. Unsafe CORS: `allow_origins=["*"]` + `allow_credentials=True`
 - **Where:** `app/main.py:53-59`
 - **Impact:** Wildcard origins with credentials is rejected by browsers / treated as insecure; enables cross-site requests to carry cookies. Also defeats the trust model.
-- **Fix:** Restrict to the actual web origin(s): `allow_origins=["http://pantry-helper.thelab.lan:3000", "http://localhost:3000"]`.
+- **Fix:** Restrict to the actual web origin(s): `allow_origins=["http://pantry.local:3000", "http://localhost:3000"]`.
 
 ### P0-3. Alembic not wired — migrations can't actually run
 - **Status:** ✅ RESOLVED / FALSE POSITIVE 2026-08-09 — alembic is fully wired and working. Retracted.
@@ -105,11 +105,11 @@ Project is **functional** (core inventory + shopping + recipes all work, deploye
 ## Doc corrections needed (FEATURE_ARCHITECTURE.md)
 Confirm-and-fix these stale lines during the same pass:
 - React Frontend: ⏳ → ✅ deployed
-- Docker Deployment / Production Deployment: → ✅ running on CT202
+- Docker Deployment / Production Deployment: → ✅ running on server
 - Pi Zero 2 W Client: ❌ → still ⏳/not shipped (keep, it's genuinely not built)
 - Barcode Scan / Nutrition Database / Recipe Integration: → ✅ works (barcode + recipes are live)
 - "Database Migrations ⚠️ Alembic config issue" → accurate (see P0-3)
 
 ---
 
-*Report generated 2026-08-09. Findings verified against live code + DB on CT202.*
+*Report generated 2026-08-09. Findings verified against live code + DB on server.*

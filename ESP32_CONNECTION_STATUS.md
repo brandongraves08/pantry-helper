@@ -19,7 +19,7 @@
 - Configured with:
   - WiFi: `Mine!` / `welcomehome`
   - Device Token: Updated with new token
-  - API Endpoint: `http://rhel-01.thelab.lan:8000/v1/ingest`
+  - API Endpoint: `http://pantry.local:8000/v1/ingest`
 
 ---
 
@@ -69,7 +69,7 @@ Your firmware **has been updated with the correct device token** but needs to be
 
 3. **Device shows online:**
    ```bash
-   curl http://rhel-01.thelab.lan:8000/v1/devices
+   curl http://pantry.local:8000/v1/devices
    ```
    Response:
    ```json
@@ -98,13 +98,13 @@ python3 -m platformio run -e esp32-cam -t upload
 python3 -m platformio device monitor
 
 # 5. Verify device online:
-curl http://rhel-01.thelab.lan:8000/v1/devices
+curl http://pantry.local:8000/v1/devices
 ```
 
 ### Option 2: Check Telnet After Upload
 ```bash
 # Once ESP32 is running and connected to WiFi:
-nc -zv rhel-01.thelab.lan 23  # Check if telnet port is open
+nc -zv pantry.local 23  # Check if telnet port is open
 # If open, you can telnet for debugging
 ```
 
@@ -128,10 +128,10 @@ nc -zv rhel-01.thelab.lan 23  # Check if telnet port is open
 
 ```bash
 # Check device status
-curl http://rhel-01.thelab.lan:8000/v1/devices
+curl http://pantry.local:8000/v1/devices
 
 # View API docs
-http://rhel-01.thelab.lan:8000/docs
+http://pantry.local:8000/docs
 
 # Check backend logs
 docker compose logs backend -f

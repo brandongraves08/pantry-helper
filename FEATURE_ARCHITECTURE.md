@@ -125,8 +125,8 @@
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| Docker Compose | ✅ Running | Full stack on CT202 (api, db, redis, worker, web, flower, promtail) |
-| Production Deployment | ✅ Deployed | `pantry-helper.thelab.lan` (CT202) |
+| Docker Compose | ✅ Running | Full stack on server (api, db, redis, worker, web, flower, promtail) |
+| Production Deployment | ✅ Deployed | `pantry.local` (server) |
 | Database Migrations | ✅ | Alembic wired (`backend/alembic.ini` + migrated `env.py`); live DB at 006 (head) |
 | Environment Variables | ✅ | Uses .env, config.py |
 | Health Check | ✅ | `/health` endpoint working |
@@ -197,7 +197,7 @@ A deep, end-to-end review of the pantry-helper project to surface issues (bugs, 
 ### P0 - Critical (Blocking Usage)
 1. ❌ **Pi Zero 2 W Client** - Hardware firmware
 2. ✅ ~~Vision Pipeline~~ - FIXED (NVIDIA NIM working)
-3. ✅ ~~Docker Deployment~~ - DONE (full stack running on CT202)
+3. ✅ ~~Docker Deployment~~ - DONE (full stack running on server)
 
 ### P1 - Feature Complete MVP
 4. ⏳ **Pattern Learning** - Built but needs filled patterns

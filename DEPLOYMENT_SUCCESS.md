@@ -3,7 +3,7 @@
 ## Status: ✅ FULLY OPERATIONAL
 
 ### Access Points
-- **Web UI**: http://127.0.0.1:3000 or http://192.168.2.79:3000
+- **Web UI**: http://127.0.0.1:3000 or http://192.168.1.100:3000
 - **API Documentation**: http://127.0.0.1:8000/docs
 - **Flower Job Monitor**: http://127.0.0.1:5555
 
@@ -96,7 +96,7 @@ docker compose down
 ### Web UI
 ```bash
 curl http://127.0.0.1:3000/
-# Or open in browser: http://192.168.2.79:3000
+# Or open in browser: http://192.168.1.100:3000
 ```
 
 ### API Health

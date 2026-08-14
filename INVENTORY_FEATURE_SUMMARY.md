@@ -123,7 +123,7 @@ All have 100% confidence and manual origin.
 
 ## Live Demo URLs
 
-- **Web UI**: http://192.168.2.79:3000 or http://127.0.0.1:3000
+- **Web UI**: http://192.168.1.100:3000 or http://127.0.0.1:3000
 - **API Documentation**: http://localhost:8000/docs
 - **API Endpoints**:
   - `GET /v1/inventory` - Get all items
@@ -133,7 +133,7 @@ All have 100% confidence and manual origin.
 ## Testing the Feature
 
 ### Test 1: View Inventory
-1. Navigate to http://192.168.2.79:3000
+1. Navigate to http://192.168.1.100:3000
 2. Scroll to inventory table
 3. See 10 test items listed
 

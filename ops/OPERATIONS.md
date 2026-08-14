@@ -4,7 +4,7 @@
 
 ## Service Location
 
-- **Host:** Proxmox LXC 202 on `proxmox-02` (192.168.2.202)
+- **Host:** Proxmox LXC 202 on `proxmox-02` (192.168.1.100)
 - **Project path (in LXC):** `/home/brandon/pantry-helper`
 - **Project path (host-side):** `/home/brandon/pantry-helper`
 - **Always verify live path** before redeploying — use `pct exec 202 -- pwd` to confirm.
@@ -13,21 +13,21 @@
 
 | Service | URL | Nagios | Notes |
 |---------|-----|--------|-------|
-| Web UI | http://pantry-helper.thelab.lan:3000 | ✅ | React dashboard — devices, inventory, captures |
-| API | http://pantry-helper.thelab.lan:8000 | ✅ | FastAPI backend — docs at /docs |
-| API Health | http://pantry-helper.thelab.lan:8000/health | ✅ | Enhanced: checks DB + Redis + storage, 503 on critical |
-| Flower (Celery) | http://pantry-helper.thelab.lan:5555 | ✅ | Celery task queue monitoring |
-| Grafana | https://grafana.homelab.graveystudios.com | — | Pantry dashboard: `/d/dfrpmw7636328d` |
+| Web UI | http://pantry.local:3000 | ✅ | React dashboard — devices, inventory, captures |
+| API | http://pantry.local:8000 | ✅ | FastAPI backend — docs at /docs |
+| API Health | http://pantry.local:8000/health | ✅ | Enhanced: checks DB + Redis + storage, 503 on critical |
+| Flower (Celery) | http://pantry.local:5555 | ✅ | Celery task queue monitoring |
+| Grafana | https://grafana.homelab.local | — | Pantry dashboard: `/d/dfrpmw7636328d` |
 
 ## Access
 
 ```bash
 # Preferred: direct service-account access to the LXC
-ssh openclaw@192.168.2.202
+ssh openclaw@192.168.1.100
 
 # Proxmox host access is available for maintenance, but routine service work
 # should happen through openclaw on the LXC.
-ssh openclaw@192.168.2.227
+ssh openclaw@192.168.1.100
 ```
 
 The `openclaw` account has sudo/docker access inside LXC 202 for deployments.
@@ -88,31 +88,31 @@ sudo pct exec 202 -- journalctl -u pantry-helper-backup.service --no-pager -n 50
 
 ### NetBox (Source of Truth)
 - **VM:** `pantry-helper` (ID 21), cluster `proxmox-02`, role `Container`
-- **Primary IPv4:** `192.168.2.202/24` assigned to `eth0` virtual interface (ID 11)
+- **Primary IPv4:** `192.168.1.100/24` assigned to `eth0` virtual interface (ID 11)
 - **Tags:** `lxc`, `docker`
 
 ### Nagios (✅ Active — 5 checks)
 
-**Host definition:** `pantry-helper` (192.168.2.202) in `/home/brandon/nagios-core/custom-plugins/pantry_helper.cfg`
+**Host definition:** `pantry-helper` (192.168.1.100) in `/home/brandon/nagios-core/custom-plugins/pantry_helper.cfg`
 
 | Check | Type | Current Status |
 |-------|------|----------------|
-| Pantry API Health | HTTP (pantry-helper.thelab.lan:8000/health) | ✅ OK |
-| Pantry Web UI | HTTP (pantry-helper.thelab.lan:3000/) | ✅ OK |
-| Pantry Flower Dashboard | HTTP (pantry-helper.thelab.lan:5555/) | ✅ OK |
+| Pantry API Health | HTTP (pantry.local:8000/health) | ✅ OK |
+| Pantry Web UI | HTTP (pantry.local:3000/) | ✅ OK |
+| Pantry Flower Dashboard | HTTP (pantry.local:5555/) | ✅ OK |
 | NCPA CPU | NCPA agent (LXC 202:5693) | ✅ OK |
 | NCPA Memory | NCPA agent (LXC 202:5693) | ✅ OK |
 
-**Validate config:** `python3 scripts/nagios_validate.py` (runs `nagios -v` in container on loki.thelab.lan)
+**Validate config:** `python3 scripts/nagios_validate.py` (runs `nagios -v` in container on loki.local)
 
 **Refresh Nagios after config change:**
 ```bash
-ssh brandon@loki.thelab.lan "docker exec nagios-core /opt/nagios/bin/nagios -v /opt/nagios/etc/nagios.cfg"
-ssh brandon@loki.thelab.lan "docker exec nagios-core /opt/nagios/bin/nagios -s /opt/nagios/var/rw/nagios.cmd"
+ssh brandon@loki.local "docker exec nagios-core /opt/nagios/bin/nagios -v /opt/nagios/etc/nagios.cfg"
+ssh brandon@loki.local "docker exec nagios-core /opt/nagios/bin/nagios -s /opt/nagios/var/rw/nagios.cmd"
 ```
 
 ### Loki / Promtail
-- `pantry-promtail` ships all Docker container logs to `loki.thelab.lan:3100`
+- `pantry-promtail` ships all Docker container logs to `loki.local:3100`
 - Label: `project="pantry-helper"` — use this in LogQL queries
 - Container names in `attrs_tag` stream (e.g., `pantry-api`, `pantry-web`)
 - All containers emit structured JSON logs to stdout/stderr
@@ -134,7 +134,7 @@ Rules location: `/loki/rules/fake/pantry-helper-alerts.yaml` inside Loki contain
 
 ### Docker Healthchecks
 - All services have `healthcheck` stanzas
-- Health endpoints: `http://pantry-helper.thelab.lan:8000/health` (API), `:3000` (web)
+- Health endpoints: `http://pantry.local:8000/health` (API), `:3000` (web)
 
 ## Configuration
 
@@ -175,12 +175,12 @@ Test deps (pytest, httpx) split into `requirements-dev.txt` — not in productio
 
 **Full rebuild (all services):**
 ```bash
-ssh openclaw@192.168.2.202 "cd /home/brandon/pantry-helper && docker compose build --no-cache && docker compose up -d"
+ssh openclaw@192.168.1.100 "cd /home/brandon/pantry-helper && docker compose build --no-cache && docker compose up -d"
 ```
 
 **Single service rebuild:**
 ```bash
-ssh openclaw@192.168.2.202 "cd /home/brandon/pantry-helper && docker compose up -d --build <service>"
+ssh openclaw@192.168.1.100 "cd /home/brandon/pantry-helper && docker compose up -d --build <service>"
 # Services: backend (API), celery_worker, web, flower
 ```
 
@@ -228,7 +228,7 @@ Unprivileged LXC prevents direct NFS mount. Need a Proxmox host-side bind mount 
 | GET | `/v1/household/members` | List household members |
 | POST | `/admin/storage/cleanup` | Trigger image retention cleanup (`?days=30`) |
 
-Full API reference: http://pantry-helper.thelab.lan:8000/docs
+Full API reference: http://pantry.local:8000/docs
 
 ## OpenClaw Integration
 

@@ -39,16 +39,16 @@ Password: [Secured - see .env.docker]
 ## Access Points
 
 ### API Endpoints
-- **Health Check:** http://rhel-01.thelab.lan:8000/health
-- **API Docs:** http://rhel-01.thelab.lan:8000/docs
-- **Device Ingest:** http://rhel-01.thelab.lan:8000/v1/ingest
-- **Inventory API:** http://rhel-01.thelab.lan:8000/v1/inventory
+- **Health Check:** http://pantry.local:8000/health
+- **API Docs:** http://pantry.local:8000/docs
+- **Device Ingest:** http://pantry.local:8000/v1/ingest
+- **Inventory API:** http://pantry.local:8000/v1/inventory
 
 ### Web Interface
-- **Dashboard:** http://rhel-01.thelab.lan:3000
+- **Dashboard:** http://pantry.local:3000
 
 ### Monitoring
-- **Flower Dashboard:** http://rhel-01.thelab.lan:5555
+- **Flower Dashboard:** http://pantry.local:5555
 
 ---
 
@@ -61,14 +61,14 @@ Edit `firmware/src/config/config.cpp`:
 strcpy(Config::settings.ssid, "YOUR_WIFI_SSID");
 strcpy(Config::settings.password, "YOUR_WIFI_PASSWORD");
 strcpy(Config::settings.device_id, "pantry-cam-001");  // Choose unique ID
-strcpy(Config::settings.api_endpoint, "http://rhel-01.thelab.lan:8000/v1/ingest");
+strcpy(Config::settings.api_endpoint, "http://pantry.local:8000/v1/ingest");
 strcpy(Config::settings.api_token, "YOUR_DEVICE_TOKEN");  // Generate via API
 ```
 
 ### Generate Device Token
 ```bash
 # Register new device
-curl -X POST http://rhel-01.thelab.lan:8000/v1/admin/devices \
+curl -X POST http://pantry.local:8000/v1/admin/devices \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Kitchen Pantry Camera",
@@ -129,7 +129,7 @@ cat backup_YYYYMMDD.sql | docker compose exec -T db psql -U pantry pantry_produc
 ### Health Checks
 ```bash
 # API health
-curl http://rhel-01.thelab.lan:8000/health
+curl http://pantry.local:8000/health
 
 # Database connectivity
 docker compose exec db psql -U pantry -d pantry_production -c "SELECT COUNT(*) FROM devices;"
@@ -140,16 +140,16 @@ docker compose exec redis redis-cli ping
 
 ### View Active Devices
 ```bash
-curl http://rhel-01.thelab.lan:8000/v1/devices
+curl http://pantry.local:8000/v1/devices
 ```
 
 ### View Current Inventory
 ```bash
-curl http://rhel-01.thelab.lan:8000/v1/inventory
+curl http://pantry.local:8000/v1/inventory
 ```
 
 ### Task Queue Monitoring
-Visit http://rhel-01.thelab.lan:5555 for Flower dashboard
+Visit http://pantry.local:5555 for Flower dashboard
 
 ---
 

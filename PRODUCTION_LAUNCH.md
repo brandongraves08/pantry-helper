@@ -40,12 +40,12 @@
 
 ### Production URLs
 ```
-API Health:      http://rhel-01.thelab.lan:8000/health
-API Docs:        http://rhel-01.thelab.lan:8000/docs
-Device Ingest:   http://rhel-01.thelab.lan:8000/v1/ingest
-Inventory API:   http://rhel-01.thelab.lan:8000/v1/inventory
-Web Dashboard:   http://rhel-01.thelab.lan:3000
-Task Monitor:    http://rhel-01.thelab.lan:5555
+API Health:      http://pantry.local:8000/health
+API Docs:        http://pantry.local:8000/docs
+Device Ingest:   http://pantry.local:8000/v1/ingest
+Inventory API:   http://pantry.local:8000/v1/inventory
+Web Dashboard:   http://pantry.local:3000
+Task Monitor:    http://pantry.local:5555
 ```
 
 ---
@@ -61,7 +61,7 @@ strcpy(Config::settings.password, "YOUR_WIFI_PASSWORD");
 
 ### Step 2: Register Your First Device
 ```bash
-curl -X POST http://rhel-01.thelab.lan:8000/v1/admin/devices \
+curl -X POST http://pantry.local:8000/v1/admin/devices \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Kitchen Pantry Camera",
@@ -105,16 +105,16 @@ docker compose restart
 ### Monitoring
 ```bash
 # API health
-curl http://rhel-01.thelab.lan:8000/health
+curl http://pantry.local:8000/health
 
 # Active devices
-curl http://rhel-01.thelab.lan:8000/v1/devices
+curl http://pantry.local:8000/v1/devices
 
 # Current inventory
-curl http://rhel-01.thelab.lan:8000/v1/inventory
+curl http://pantry.local:8000/v1/inventory
 
 # Task queue (visit in browser)
-http://rhel-01.thelab.lan:5555
+http://pantry.local:5555
 ```
 
 ### Backup Database
