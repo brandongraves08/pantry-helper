@@ -16,6 +16,15 @@ A battery-powered, event-driven pantry inventory system using ESP32 camera, Open
 - **Database**: PostgreSQL (or SQLite for dev) storing devices, captures, observations, and inventory state
 - **Web UI**: React dashboard for viewing current inventory, history, and manual corrections
 
+## Features
+
+- **Inventory tracking** — par levels, expiry dates, low-stock alerts, product images (Open Food Facts backfill)
+- **Recipe library** — save recipes with ingredients linked to your inventory
+- **Meal planning** — schedule recipes per day/week; verify planned meals against pantry stock (7-day window)
+- **Smart shopping list** — par-driven + meal-plan-driven items merged automatically, ready for your grocery order
+- **Barcode scanning** — lookup + add to inventory
+- **Household profiles** — members, dietary restrictions, nutrition targets
+
 ## Quick Start
 
 ### Docker (Fastest)
