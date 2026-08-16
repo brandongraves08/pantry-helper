@@ -105,6 +105,28 @@ class InventoryState(Base):
     item = relationship("InventoryItem", back_populates="states")
     location = relationship("Location")
 
+class InventoryFlag(Base):
+    """User-reported issue on an inventory item (wrong image/brand/count/name...).
+
+    The flag button in the UI + free-text reason let Brandon tell the system what's
+    wrong (e.g. OFF backfill pulled a wrong-brand image). Hermes picks open flags up
+    via GET /v1/inventory/flags, fixes the item, then resolves the flag.
+    """
+
+    __tablename__ = "inventory_flags"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    item_id = Column(String, ForeignKey("inventory_items.id"), nullable=False, index=True)
+    field = Column(String, nullable=True)  # image | brand | count | name | other
+    reason = Column(Text, nullable=False)
+    status = Column(String, nullable=False, default="open", index=True)  # open | resolved
+    resolution_note = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    resolved_at = Column(DateTime(timezone=True), nullable=True)
+
+    item = relationship("InventoryItem", backref="flags")
+
+
 class InventoryEvent(Base):
     __tablename__ = "inventory_events"
 

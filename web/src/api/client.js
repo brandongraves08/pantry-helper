@@ -298,4 +298,26 @@ export const updateShoppingFromPlan = async (planId, params = {}) => {
   return data
 }
 
+// ── Inventory Flags API (user-reported item issues) ────────────────
+
+export const flagInventoryItem = async (itemId, payload) => {
+  const { data } = await apiClient.post(`/v1/inventory/${itemId}/flag`, payload)
+  return data
+}
+
+export const listFlags = async (status = 'open', limit = 50) => {
+  const { data } = await apiClient.get('/v1/inventory/flags', { params: { status, limit } })
+  return data
+}
+
+export const listItemFlags = async (itemId) => {
+  const { data } = await apiClient.get(`/v1/inventory/${itemId}/flags`)
+  return data
+}
+
+export const resolveFlag = async (flagId, resolutionNote = '') => {
+  const { data } = await apiClient.post(`/v1/inventory/flags/${flagId}/resolve`, { resolution_note: resolutionNote })
+  return data
+}
+
 export default apiClient

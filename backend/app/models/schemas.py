@@ -117,6 +117,30 @@ class HebEnrichmentPayload(BaseModel):
     image_url: Optional[str] = None
 
 
+class FlagCreate(BaseModel):
+    """User-reported issue on an inventory item."""
+    field: Optional[str] = None  # image | brand | count | name | other
+    reason: str
+
+
+class FlagResolve(BaseModel):
+    """Mark a flag resolved (after the agent/admin fixed the underlying issue)."""
+    resolution_note: Optional[str] = None
+
+
+class FlagResponse(BaseModel):
+    """An inventory flag as returned by the API."""
+    id: str
+    item_id: str
+    canonical_name: Optional[str] = None
+    field: Optional[str] = None
+    reason: str
+    status: str  # open | resolved
+    resolution_note: Optional[str] = None
+    created_at: datetime
+    resolved_at: Optional[datetime] = None
+
+
 class ShoppingListItem(BaseModel):
     item_name: str
     needed: int

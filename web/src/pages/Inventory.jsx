@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Package, Search, Filter, Plus, ArrowUpDown, AlertTriangle, Apple, X, Check, Loader, Pencil, MapPin, Star, Heart } from 'lucide-react';
+import { Package, Search, Filter, Plus, ArrowUpDown, AlertTriangle, Apple, X, Check, Loader, Pencil, MapPin, Star, Heart, Flag, Info } from 'lucide-react';
 import * as api from '../api/client';
 
 export default function Inventory() {
   const [items, setItems] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
+  const [flaggedItemIds, setFlaggedItemIds] = useState(new Set());
 
   // Filter / sort state
   const [filterOpen, setFilterOpen] = useState(false);
@@ -28,6 +29,13 @@ export default function Inventory() {
   const [searching, setSearching] = useState(false);
   const [savingNutrition, setSavingNutrition] = useState(false);
   const [nutritionSaved, setNutritionSaved] = useState(false);
+
+  // Flag state
+  const [flagItem, setFlagItem] = useState(null); // item object; null = modal closed
+  const [flagField, setFlagField] = useState(''); // image | brand | count | name | other
+  const [flagReason, setFlagReason] = useState('');
+  const [savingFlag, setSavingFlag] = useState(false);
+  const [flagError, setFlagError] = useState('');
 
   useEffect(() => {
     loadInventory();
@@ -54,6 +62,13 @@ export default function Inventory() {
         notes: item.notes || null,
       }));
       setItems(loaded);
+      // Load open flags in parallel to highlight flagged rows
+      try {
+        const flagData = await api.listFlags('open', 200);
+        setFlaggedItemIds(new Set((flagData.flags || []).map(f => f.item_id)));
+      } catch {
+        setFlaggedItemIds(new Set());
+      }
     } catch {
       setItems([
         { id: '1', name: 'Tomatoes', brand: 'Del Monte', category: 'Canned Goods', package_type: 'can', count: 4, par_level: 2, expires_at: '2026-06-15' },
@@ -177,6 +192,40 @@ export default function Inventory() {
       await loadInventory();
     } catch (err) {
       console.error('Failed to favorite item:', err);
+    }
+  };
+
+  // ── Flag handlers ────────────────────────────────────────────────
+
+  const openFlag = (item) => {
+    setFlagItem(item);
+    setFlagField('');
+    setFlagReason('');
+    setFlagError('');
+  };
+
+  const closeFlag = () => {
+    setFlagItem(null);
+    setSavingFlag(false);
+  };
+
+  const handleSubmitFlag = async () => {
+    if (!flagReason.trim()) {
+      setFlagError('Please describe what is wrong.');
+      return;
+    }
+    setSavingFlag(true);
+    setFlagError('');
+    try {
+      await api.flagInventoryItem(flagItem.item_id || flagItem.id, {
+        field: flagField || null,
+        reason: flagReason.trim(),
+      });
+      closeFlag();
+      await loadInventory();
+    } catch (err) {
+      setFlagError(err?.response?.data?.detail || 'Failed to submit flag.');
+      setSavingFlag(false);
     }
   };
 
@@ -355,7 +404,7 @@ export default function Inventory() {
             </thead>
             <tbody className="divide-y">
               {filteredItems.map((item) => (
-                <tr key={item.id} className="hover:bg-gray-50">
+                <tr key={item.id} className={`hover:bg-gray-50 ${flaggedItemIds.has(item.item_id) ? 'bg-amber-50' : ''}`}>
                   <td className="px-4 sm:px-6 py-4">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center shrink-0">
@@ -372,6 +421,11 @@ export default function Inventory() {
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
                           <p className="font-medium text-gray-900 truncate">{item.name}</p>
+                          {flaggedItemIds.has(item.item_id) && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 bg-amber-100 rounded-full shrink-0" title="Flagged — awaiting review">
+                              <Flag size={10} /> Flagged
+                            </span>
+                          )}
                           <button
                             onClick={() => handleQuickFavorite(item)}
                             className={`shrink-0 ${item.is_favorite ? 'text-pink-500' : 'text-gray-300 hover:text-pink-400'}`}
@@ -430,10 +484,16 @@ export default function Inventory() {
                     </button>
                   </td>
                   <td className="px-4 sm:px-6 py-4">
-                    <button onClick={() => openEdit(item)} className="flex items-center gap-1 text-blue-600 hover:text-blue-800 text-sm font-medium whitespace-nowrap">
-                      <Pencil size={14} />
-                      Edit
-                    </button>
+                    <div className="flex items-center gap-3 whitespace-nowrap">
+                      <button onClick={() => openFlag(item)} className="flex items-center gap-1 text-amber-600 hover:text-amber-800 text-sm font-medium" title="Flag incorrect info (image, brand, count, name)">
+                        <Flag size={14} />
+                        Flag
+                      </button>
+                      <button onClick={() => openEdit(item)} className="flex items-center gap-1 text-blue-600 hover:text-blue-800 text-sm font-medium">
+                        <Pencil size={14} />
+                        Edit
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -585,6 +645,76 @@ export default function Inventory() {
             <div className="border-t px-6 py-4">
               <button onClick={closeNutrition} className="w-full px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Flag Item Modal ───────────────────────────────────────── */}
+      {flagItem && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900">Flag Issue</h3>
+              <button onClick={closeFlag} className="p-1 rounded hover:bg-gray-100">
+                <X size={20} className="text-gray-500" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <Info size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                <p className="text-sm text-amber-800">
+                  Reporting an issue with <span className="font-semibold">{flagItem.name}</span>. Hermes picks these up and fixes the underlying data.
+                </p>
+              </div>
+              {flagError && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-red-700 text-sm">{flagError}</p>
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">What's wrong?</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { v: 'image', l: 'Image' },
+                    { v: 'brand', l: 'Brand' },
+                    { v: 'count', l: 'Count' },
+                    { v: 'name', l: 'Name' },
+                    { v: 'other', l: 'Other' },
+                  ].map((o) => (
+                    <button
+                      key={o.v}
+                      type="button"
+                      onClick={() => setFlagField(o.v)}
+                      className={`px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${flagField === o.v ? 'bg-amber-500 text-white border-amber-500' : 'text-gray-700 border-gray-200 hover:bg-gray-50'}`}
+                    >
+                      {o.l}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Details *</label>
+                <textarea
+                  rows="3"
+                  value={flagReason}
+                  onChange={(e) => setFlagReason(e.target.value)}
+                  placeholder="e.g. This is Bush's baked beans, not the Korean BBQ one — wrong image and brand."
+                  className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-amber-500"
+                />
+              </div>
+            </div>
+            <div className="border-t px-6 py-4 flex gap-3">
+              <button onClick={closeFlag} className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmitFlag}
+                disabled={savingFlag}
+                className="flex-1 px-4 py-2 text-sm font-medium text-white bg-amber-500 rounded-lg hover:bg-amber-600 disabled:opacity-50"
+              >
+                {savingFlag ? <Loader size={14} className="animate-spin inline" /> : 'Submit Flag'}
               </button>
             </div>
           </div>
