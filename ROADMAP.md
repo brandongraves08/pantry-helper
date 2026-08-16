@@ -26,32 +26,79 @@
 
 ---
 
+## 🎙 Alexa Voice Integration — ACTIVE TRACK (in progress)
+
+**Goal:** "Alexa, add apples to pantry list" → item lands on the shopping list → flows into the real HEB order. Voice → pantry is the natural hands-free path (kitchen, cooking, standing at the pantry).
+
+**Architecture (the flow):**
+```
+Echo → Alexa skill "Pantry Helper" (Lambda, alexa-hosted)
+  → HTTPS POST pantry-voice.graveystudios.com/v1/shopping-list/items  {item_name, quantity}
+  → pantry-api creates/updates shopping row (reason: voice, deduped, links inventory item when matched)
+  → next HEB order (heb_cart_filler) picks the row up automatically — no extra work
+```
+
+### ✅ Done (2026-08-16)
+
+- **Backend endpoint** — `POST /v1/shopping-list/items` (schema `VoiceShoppingAdd`; service `add_voice_item` in `services/shopping.py`). Verified live: free-text "Coconut Water" → row created (reason `voice`); same item again → quantity bumped (dedupe); "Black Beans" → linked to the tracked inventory item. Deployed, commit `cf144bf`.
+- **Public HTTPS endpoint** — Cloudflare Tunnel `pantry-voice` (TID `45cfff98-ec13-42d2-8ab5-0adfc332281e`) → CT202:8000, DNS `pantry-voice.graveystudios.com`, systemd `pantry-tunnel` on CT202 (cloudflared 2026.8.2, ingress RESTRICTED to path `/v1/shopping-list/items*`; everything else 404s at the tunnel). Verified from public internet: no token → 401, token → 200, `/v1/shopping-list` → 404, `/health` → 404. Scoped CF token `pantry-voice-tunnel-*` minted (Tunnel Write + DNS Write); old `voicelab` tunnel token was stale — do NOT reuse.
+- **Alexa skill created** — **"Pantry Helper"** in the dev console, ID `amzn1.ask.skill.76d59d51-9e10-4b3c-843f-7e449e243328`. Custom model, Alexa-hosted (Node.js), US East (N. Virginia), Start from Scratch template. Dev-account login works via the Camofox shared-browser session (same Amazon account as the cart automation — warm session, no fresh auth wall).
+
+### ⏳ Remaining (ordered)
+
+| # | Step | Detail | Effort |
+|---|------|--------|--------|
+| A | **Interaction model** | In the dev console → Interaction Model → JSON Editor: add intent `AddItemIntent` (or `AddToPantry`) with slot `ItemName` (custom slot type w/ pantry food values + free-text fallback `AMAZON.SearchQuery` optional) and optional `Quantity` (`AMAZON.NUMBER`). Sample utterances: "add {ItemName} to the pantry list", "add {ItemName} to the shopping list", "put {ItemName} on the list", "add {Quantity} {ItemName} to the pantry list". | M (console JSON) |
+| B | **Lambda code** | Replace Hello World handler: `AddItemIntent` → parse slots → `fetch` POST to `https://pantry-voice.graveystudios.com/v1/shopping-list/items` with `Authorization: Bearer <token>` → speak "Added {quantity} {item} to your shopping list" / error response. Handle LaunchRequest + Help/Stop/Cancel. | M |
+| C | **Token in env** | Store `PANTRY_API_TOKEN` in the Alexa-hosted Lambda env vars (never hardcode in code). Token lives on CT202 `.env` / container env. | S |
+| D | **Save + build + deploy** | Save interaction model, Build the skill (catches model errors), deploy Lambda code. Verify via the Alexa simulator: type "open pantry helper" → "add apples to the pantry list" → confirm 200 + row in shopping list. | M |
+| E | **Echo enable + live test** | Enable the skill on the household Echo (dev skills are only testable via the dev account by default — may need "skills you have enabled" toggle / beta test group if it must run on the family's device), say the phrase for real, verify the HEB order picks it up. | S (needs Echo access) |
+| F | **Polish** | Friendly responses ("Added 2 apples. Anything else?"), multi-item ("add milk and eggs"), remove-by-voice ("take bananas off the list"), quantity normalization ("half a dozen"). Post-launch. | L |
+
+### 🔒 Security posture (deliberate)
+
+- Tunnel exposes ONLY `/v1/shopping-list/items` — no inventory/shopping-list reads, no meal plans, no flags. Everything else 404s at the edge.
+- Write auth is Bearer-protected; the skill is the only public caller.
+- CF tunnel token is scoped (Tunnel Write + DNS Write on the graveystudios zone); the tunnel itself has no public admin surface.
+- Consider an Alexa skill permissions page / account linking later if we ever want per-user voice identity. Not needed for a single-household list.
+
+### 📌 Session notes (for resuming)
+
+- Skill dashboard tab is open in Camofox `shared-browser` (tab id `958be351-7d70-499c-bd1a-10cb09b3ce33`); the dev console session may be reaped by the idle reaper — re-login via the amazon-cart-automation recipe if needed (2FA → SMS to phone-561, Brandon reads the code).
+- Driving the console: use Camofox native click with shadow-piercing selectors (`section.astro-card:has-text(...)`, `button.astro__button--primary`) — synthetic `el.click()` through evaluate resets the wizard. Snapshot endpoint (`/tabs/{id}/snapshot?userId=shared-browser&format=semantic`) gives refs (eN) for reliable clicks.
+- The Alexa-hosted runtime is `nodejs16.x` on the template URL — fine for a simple fetch handler; don't upgrade runtime without testing.
+
+---
+
 ## 📋 Next Steps (prioritized — the actual plan)
 
-### P1 — High value, low effort (do first)
+### P0 — Active now
+1. **Finish the Alexa voice track (A–E above)** — interaction model → Lambda → deploy → simulator test → Echo enable. This is the feature Brandon asked for; everything else waits.
+
+### P1 — High value, low effort (after Alexa ships)
 
 | # | Item | Why | Rough effort |
 |---|------|-----|--------------|
-| 1 | **Expiry/low-stock alerts to Discord** | `expires_at` + low-stock data already live; UI shows badges but nothing pushes. A small watcher (Hermes cron, no_agent) pings #alerts when items cross 7d-to-expiry or go below par. No app code needed. | S (script + cron) |
-| 2 | **Meal-plan allergen & nutrition warnings** | Household member routes exist (backend) but the UI is a stub and nothing checks a planned meal against a member's allergens/restrictions. Wire the verify response to warn "contains peanut — wife is allergic." Real family value, uses existing tables. | M (backend verify + UI) |
-| 3 | **Recipe suggestions from stock** | Recipes + inventory both live; "what can I cook with what I have" is the natural next pull. `GET /v1/recipes/suggest?match=on_hand` — score recipes by % ingredients in stock. | M |
+| 2 | **Expiry/low-stock alerts to Discord** | `expires_at` + low-stock data already live; UI shows badges but nothing pushes. A small watcher (Hermes cron, no_agent) pings #alerts when items cross 7d-to-expiry or go below par. No app code needed. | S (script + cron) |
+| 3 | **Meal-plan allergen & nutrition warnings** | Household member routes exist (backend) but the UI is a stub and nothing checks a planned meal against a member's allergens/restrictions. Wire the verify response to warn "contains peanut — wife is allergic." Real family value, uses existing tables. | M (backend verify + UI) |
+| 4 | **Recipe suggestions from stock** | Recipes + inventory both live; "what can I cook with what I have" is the natural next pull. `GET /v1/recipes/suggest?match=on_hand` — score recipes by % ingredients in stock. | M |
 
 ### P2 — Next tier (after P1)
 
 | # | Item | Why | Rough effort |
 |---|------|-----|--------------|
-| 4 | **Supply forecasting** | `consumption_events` table exists but nothing writes it. Hook verify/meal-plan consumption → depletion estimates ("~7 days of cereal"). | L (data model + writes + UI) |
-| 5 | **Backend test suite (pytest)** | Zero backend tests today; the parse_quantity + verify math are the riskiest code. Lock the heuristics down before more features stack on them. | M |
-| 6 | **Expiry OCR** | Vision pipeline could parse dates off labels; currently expiry is manual. Nice-to-have while the camera flow is dormant. | M |
+| 5 | **Supply forecasting** | `consumption_events` table exists but nothing writes it. Hook verify/meal-plan consumption → depletion estimates ("~7 days of cereal"). | L (data model + writes + UI) |
+| 6 | **Backend test suite (pytest)** | Zero backend tests today; the parse_quantity + verify math are the riskiest code. Lock the heuristics down before more features stack on them. | M |
+| 7 | **Expiry OCR** | Vision pipeline could parse dates off labels; currently expiry is manual. Nice-to-have while the camera flow is dormant. | M |
 
 ### P3 — Parked / separate tracks
 
 | # | Item | Why it's parked |
 |---|------|-----------------|
-| 7 | **YOLOv8 + pattern learning** | Stub exists, `ultralytics` not installed; zone/spatial inference inert. Documented as unbuilt — revisit only if the camera/ESP32 path comes back. |
-| 8 | **ESP32 / Pi Zero camera hardware** | Separate project (`projects/pantry-helper-hardware`), on hold. The software side doesn't need it. |
-| 9 | **Full login/roles, E2E (Playwright), load tests, theme system** | Bearer-token write auth is adequate for LAN; polish items, low urgency. |
-| 10 | **Model comparison harness** | Needs OpenAI/NVIDIA credits; revisit when the vision pipeline is active again. |
+| 8 | **YOLOv8 + pattern learning** | Stub exists, `ultralytics` not installed; zone/spatial inference inert. Documented as unbuilt — revisit only if the camera/ESP32 path comes back. |
+| 9 | **ESP32 / Pi Zero camera hardware** | Separate project (`projects/pantry-helper-hardware`), on hold. The software side doesn't need it. |
+| 10 | **Full login/roles, E2E (Playwright), load tests, theme system** | Bearer-token write auth is adequate for LAN; polish items, low urgency. |
+| 11 | **Model comparison harness** | Needs OpenAI/NVIDIA credits; revisit when the vision pipeline is active again. |
 
 ---
 
@@ -77,14 +124,16 @@
 - ✅ Auth on writes + rate limiting
 - ✅ Meal planning → HEB order flow (the flagship feature)
 - ✅ Flag & feedback loop closed (08-16)
+- 🎙 Alexa voice → shopping list: endpoint + tunnel + skill scaffold done (08-16); model/code/deploy/Echo pending (P0)
 - ➖ Tests (0 backend) — P2
 - ➖ Expiry OCR — P2
-- ➖ Push alerts — P1 #1
+- ➖ Push alerts — P1 #2
 
 ---
 
 ## 🗓 Cadence
 
+- **P0 right now** — finish the Alexa track: interaction model → Lambda → deploy → simulator test → Echo enable. (Next session picks up at step A in the Alexa section.)
 - **Daily 6pm CT** — pantry verification loop (Hermes cron) — working through unverified items.
 - **Daily 4am CT** — HEB enrichment automator (silent when nothing pending).
 - **Weekly** — check `GET /v1/inventory/flags` open queue + pending HEB items; work the plan above on-demand.
