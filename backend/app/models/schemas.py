@@ -123,6 +123,12 @@ class FlagCreate(BaseModel):
     reason: str
 
 
+class VoiceShoppingAdd(BaseModel):
+    """Add an item to the shopping list by name (Alexa/voice path)."""
+    item_name: str
+    quantity: int = 1
+
+
 class FlagResolve(BaseModel):
     """Mark a flag resolved (after the agent/admin fixed the underlying issue)."""
     resolution_note: Optional[str] = None

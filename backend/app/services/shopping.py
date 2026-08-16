@@ -43,6 +43,58 @@ def recompute_shopping_list(db: Session) -> int:
     return created_or_updated
 
 
+def add_voice_item(db: Session, item_name: str, quantity: int = 1) -> dict:
+    """Add an item by name (Alexa/voice path) to the shopping list.
+
+    If an inventory item matches the name, links item_id; otherwise creates a
+    free-text row (item_id NULL) — get_unresolved_items falls back to item_name,
+    so it still reaches the HEB cart filler. Dedupes against unresolved rows:
+    bump needed to max(existing, requested).
+    """
+    name = (item_name or "").strip()
+    if not name:
+        raise ValueError("item_name is required")
+    qty = max(1, int(quantity or 1))
+
+    from app.db.models import InventoryItem
+
+    item = (
+        db.query(InventoryItem)
+        .filter(InventoryItem.canonical_name.ilike(name))
+        .first()
+    )
+
+    existing = (
+        db.query(ShoppingListItemModel)
+        .filter(ShoppingListItemModel.resolved_at.is_(None))
+        .filter(
+            ShoppingListItemModel.item_id == (item.id if item else None)
+            if item
+            else ShoppingListItemModel.item_name.ilike(name)
+        )
+        .first()
+    )
+
+    if existing:
+        existing.needed = max(existing.needed, qty)
+        existing.reason = existing.reason or "voice"
+    else:
+        db.add(
+            ShoppingListItemModel(
+                item_id=item.id if item else None,
+                item_name=None if item else name,
+                needed=qty,
+                reason="voice",
+            )
+        )
+    db.commit()
+    return {
+        "item_name": item.canonical_name if item else name,
+        "needed": qty,
+        "linked_inventory": item is not None,
+    }
+
+
 def get_unresolved_items(db: Session) -> list[dict]:
     """Return unresolved shopping list items as plain dicts (name, needed, reason, location).
 
