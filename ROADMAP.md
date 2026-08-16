@@ -127,16 +127,17 @@ Echo → Alexa skill "Pantry Helper" (Lambda, alexa-hosted)
 - ✅ Auth on writes + rate limiting
 - ✅ Meal planning → HEB order flow (the flagship feature)
 - ✅ Flag & feedback loop closed (08-16)
-- ✅ **Alexa voice → shopping list: E2E PASSED in simulator** (08-16) — skill live, model built, Lambda deployed, apples + beans landed in the DB. Echo enable + live-test pending (step E)
+- ✅ Alexa voice → shopping list: E2E PASSED in simulator (08-16) — skill live, model built, Lambda deployed, apples + beans landed in the DB. Echo enable pending (needs linked-device test)
+- ✅ P1-1: Expiry/low-stock Discord alerts watcher — script runs daily 08:00 CT, posts to #alerts when thresholds crossed. Verified live 2026-08-16 (14 low-stock items). Job ID a89077f0d82f.
 - ➖ Tests (0 backend) — P2
 - ➖ Expiry OCR — P2
-- ➖ Push alerts — P1 #2
+- ✅ Push alerts — P1
 
 ---
 
 ## 🗓 Cadence
 
-- **P0 right now** — Alexa track is at step E: Echo enable + live test. After that, P1 (alerts, allergen warnings, recipe suggestions).
+- **P0 right now** — Alexa track is complete on our side: interaction model built, Lambda deployed, simulator verified (one-shot works), roadmap updated. **Remaining: you say the phrase on a linked Echo** (skill is dev-stage, so it works on your devices with testing enabled).
 - **Daily 6pm CT** — pantry verification loop (Hermes cron) — working through unverified items.
 - **Daily 4am CT** — HEB enrichment automator (silent when nothing pending).
 - **Weekly** — check `GET /v1/inventory/flags` open queue + pending HEB items; work the plan above on-demand.
