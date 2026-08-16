@@ -298,6 +298,18 @@ export const updateShoppingFromPlan = async (planId, params = {}) => {
   return data
 }
 
+// ── Reviews API (manual verification queue) ────────────────────────
+
+export const listPendingReviews = async () => {
+  const { data } = await apiClient.get('/v1/reviews/pending')
+  return data
+}
+
+export const resolveReview = async (reviewId, action) => {
+  const { data } = await apiClient.post(`/v1/reviews/${reviewId}/${action}`)
+  return data
+}
+
 // ── Inventory Flags API (user-reported item issues) ────────────────
 
 export const flagInventoryItem = async (itemId, payload) => {

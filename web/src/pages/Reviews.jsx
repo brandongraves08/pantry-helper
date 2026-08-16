@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
-import { AlertCircle, CheckCircle, XCircle, Camera, RefreshCw, Loader, Edit3, ChevronDown, ChevronUp, Package } from 'lucide-react';
+import { AlertCircle, CheckCircle, XCircle, RefreshCw, Loader, Edit3, ChevronDown, ChevronUp, Package } from 'lucide-react';
 import * as api from '../api/client';
 
 export default function Reviews() {
   const [captures, setCaptures] = useState([]);
   const [detections, setDetections] = useState({});
+  const [reviews, setReviews] = useState([]); // pending manual verification queue
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(null);
   const [actionMsg, setActionMsg] = useState({});
+  const [reviewMsg, setReviewMsg] = useState({});
   const [editModal, setEditModal] = useState(null); // { captureId, index, item }
 
   useEffect(() => {
@@ -17,6 +19,14 @@ export default function Reviews() {
   const loadData = async () => {
     setLoading(true);
     try {
+      // Pending manual review queue (reviews created via POST /v1/reviews)
+      try {
+        const revData = await api.listPendingReviews();
+        setReviews(revData || []);
+      } catch {
+        setReviews([]);
+      }
+
       const capData = await api.listCaptures({ limit: 25 });
       const caps = capData.captures || [];
 
@@ -88,6 +98,19 @@ export default function Reviews() {
     }
   };
 
+  const handleReviewAction = async (reviewId, action) => {
+    try {
+      await api.resolveReview(reviewId, action);
+      setReviewMsg({ [reviewId]: action === 'approve' ? 'approved' : 'rejected' });
+      // Refresh queue
+      const revData = await api.listPendingReviews();
+      setReviews(revData || []);
+      setTimeout(() => setReviewMsg({}), 3000);
+    } catch (err) {
+      setReviewMsg({ [reviewId]: 'error: ' + (err.response?.data?.detail || err.message) });
+    }
+  };
+
   const toggleExpand = (id) => {
     setExpanded(expanded === id ? null : id);
   };
@@ -99,30 +122,103 @@ export default function Reviews() {
           <h2 className="text-base sm:text-2xl font-bold text-gray-900">Verification</h2>
           <p className="text-sm text-gray-500">Review items detected by AI vision</p>
         </div>
-        <button
-          onClick={loadData}
-          disabled={loading}
-          className="flex items-center gap-2 px-3 sm:px-4 py-2 text-sm font-medium text-gray-700 bg-white border rounded-lg hover:bg-gray-50"
-        >
-          <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-          <span className="hidden sm:inline">Refresh</span>
-        </button>
+        <div className="flex items-center gap-2">
+          {reviews.length > 0 && (
+            <span className="px-2.5 py-1 text-xs font-semibold text-amber-700 bg-amber-100 rounded-full">
+              {reviews.length} pending review{reviews.length === 1 ? '' : 's'}
+            </span>
+          )}
+          <button
+            onClick={loadData}
+            disabled={loading}
+            className="flex items-center gap-2 px-3 sm:px-4 py-2 text-sm font-medium text-gray-700 bg-white border rounded-lg hover:bg-gray-50"
+          >
+            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+            <span className="hidden sm:inline">Refresh</span>
+          </button>
+        </div>
       </div>
+
+      {/* Pending manual review queue */}
+      {reviews.length > 0 && (
+        <div className="bg-white rounded-xl border overflow-hidden">
+          <div className="px-3 sm:px-6 py-3 sm:py-4 bg-amber-50 border-b">
+            <h3 className="font-semibold text-amber-900 flex items-center gap-2">
+              <AlertCircle size={16} />
+              Manual Review Queue
+            </h3>
+            <p className="text-xs text-amber-700 mt-0.5">Camera checks awaiting your decision. Approve to process the capture, reject to discard.</p>
+          </div>
+          <div className="divide-y">
+            {reviews.map((rev) => {
+              const rmsg = reviewMsg[rev.id];
+              const cap = captures.find(c => c.id === rev.capture_id);
+              return (
+                <div key={rev.id} className="px-3 sm:px-6 py-3 sm:py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-medium text-gray-900 truncate">
+                      Capture {rev.capture_id.slice(0, 8)}...
+                      {cap && <span className="ml-2 text-xs font-normal text-gray-500">{cap.status}</span>}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {rev.created_at ? new Date(rev.created_at).toLocaleString() : 'N/A'}
+                    </p>
+                    {rev.notes && <p className="text-sm text-gray-600 mt-1 truncate">{rev.notes}</p>}
+                  </div>
+                  <div className="flex items-center gap-1.5 w-full sm:w-auto">
+                    {rmsg === 'approved' && <span className="text-xs text-green-600 font-medium">Approved ✓</span>}
+                    {rmsg === 'rejected' && <span className="text-xs text-red-600 font-medium">Rejected ✗</span>}
+                    {rmsg && rmsg.startsWith('error') && <span className="text-xs text-red-600">{rmsg}</span>}
+                    {!rmsg && (
+                      <>
+                        <button
+                          onClick={() => handleReviewAction(rev.id, 'approve')}
+                          className="flex items-center justify-center sm:gap-1 px-2 sm:px-3 py-1.5 text-xs font-medium text-green-700 bg-green-100 rounded-lg hover:bg-green-200 flex-1 sm:flex-none"
+                        >
+                          <CheckCircle size={14} />
+                          <span className="sm:inline"> Approve</span>
+                        </button>
+                        <button
+                          onClick={() => handleReviewAction(rev.id, 'reject')}
+                          className="flex items-center justify-center sm:gap-1 px-2 sm:px-3 py-1.5 text-xs font-medium text-red-700 bg-red-100 rounded-lg hover:bg-red-200 flex-1 sm:flex-none"
+                        >
+                          <XCircle size={14} />
+                          <span className="sm:inline"> Reject</span>
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="flex items-center justify-center py-12 text-gray-400">
           <Loader size={24} className="animate-spin mr-2" />
           Loading detections...
         </div>
-      ) : captures.length === 0 ? (
+      ) : captures.filter(c => c.status !== 'failed').length === 0 ? (
         <div className="text-center py-12 bg-gray-50 rounded-xl">
-          <Camera size={48} className="mx-auto text-gray-400 mb-4" />
-          <p className="text-gray-600 font-medium">No captures yet</p>
-          <p className="text-sm text-gray-500">Upload a photo to get started</p>
+          <AlertCircle size={48} className="mx-auto text-gray-400 mb-4" />
+          <p className="text-gray-600 font-medium">Nothing to review</p>
+          <p className="text-sm text-gray-500">
+            {captures.length > 0
+              ? `${captures.length} capture(s) exist but all failed — nothing actionable right now.`
+              : 'Upload a photo to get started'}
+          </p>
         </div>
       ) : (
         <div className="space-y-4">
-          {captures.map((cap) => {
+          {captures.some(c => c.status === 'failed') && (
+            <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-500">
+              <AlertCircle size={14} className="text-gray-400" />
+              {captures.filter(c => c.status === 'failed').length} failed capture(s) hidden — not actionable.
+            </div>
+          )}
+          {captures.filter(c => c.status !== 'failed').map((cap) => {
             const det = detections[cap.id];
             const items = det?.items || [];
             const isExpanded = expanded === cap.id;
