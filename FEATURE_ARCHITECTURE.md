@@ -72,20 +72,20 @@
 | Shopping List Generation | ✅ | `/v1/shopping` (par-driven) + meal-plan merge (`/v1/meal-plans/{id}/update-shopping`, 2026-08-14) |
 | Manual Override | ✅ | `/v1/inventory/override` + Add/Edit UI |
 | Product Images | ✅ | OFF backfill + `image_url` in API/UI (2026-08-09) |
-| ⏳ Flag Incorrect Info + Feedback | ⏳ | **PLANNED** - per-item "flag incorrect" button + free-text box so the user can tell the system what's wrong (e.g. wrong product, wrong brand, wrong image, wrong count). System flags item + surfaces the note for correction. |
+| Flag Incorrect Info + Feedback | ✅ | **BUILT 2026-08-16** — per-item "Flag" button + field picker (image/brand/count/name/other) + free-text reason; `POST /v1/inventory/{item_id}/flag`, `GET /v1/inventory/flags`, `POST /v1/inventory/flags/{flag_id}/resolve`. Flagged rows highlighted amber in UI. Hermes picks flags up, fixes the item, resolves. |
 
-### 3a. Flag Incorrect Info + Feedback (PLANNED)
+### 3a. Flag Incorrect Info + Feedback (BUILT 2026-08-16)
 
 **Goal:** Let the user mark any inventory item as incorrect and explain why, so errors (e.g. a mismatched product image auto-fetched from Open Food Facts) can be flagged and corrected.
 
 | Component | Status | Details |
 |-----------|--------|---------|
-| ✅ Flag via API | ⏳ | `POST /v1/inventory/{item_id}/flag` with a `reason` (free-text) and optional `field` (image/brand/count/name) |
-| Flag on Item Row | ⏳ | Button on each inventory row |
-| Free-Text Box | ⏳ | Text box/modal to let the user describe the problem |
-| Flag Visibility | ⏳ | Flagged items highlighted in UI |
-| Review/Clear | ⏳ | Agent or admin reviews flags, fixes the item, clears the flag |
-| Flagged Items Endpoint | ⏳ | `GET /v1/inventory/flags` for the agent to process |
+| Flag via API | ✅ | `POST /v1/inventory/{item_id}/flag` with `reason` (free-text, required) + optional `field` (image/brand/count/name/other) |
+| Flag on Item Row | ✅ | "Flag" button on each inventory row (amber, next to Edit) |
+| Free-Text Box | ✅ | Modal with field picker + textarea on the web UI |
+| Flag Visibility | ✅ | Flagged rows highlighted amber + "Flagged" badge next to item name |
+| Review/Clear | ✅ | Agent or admin reviews flags, fixes the item, resolves via `POST /v1/inventory/flags/{flag_id}/resolve` with optional `resolution_note` |
+| Flagged Items Endpoint | ✅ | `GET /v1/inventory/flags?status=open|resolved|all` + `GET /v1/inventory/{item_id}/flags` for per-item history |
 
 **Trigger/Example:** Image auto-fetch may pull a wrong-brand product. User clicks "Flag" on an item, types "This is Bush's baked beans, not the Korean BBQ one" → system marks it flagged, Hermes picks it up and fixes the image/data.
 
@@ -202,9 +202,9 @@ A deep, end-to-end review of the pantry-helper project to surface issues (bugs, 
 ### P1 - Feature Complete MVP
 4. ⏳ **Pattern Learning** - Built but needs filled patterns
 5. ⏳ **YOLOv8 Integration** - Bounding box detection
-6. ⏳ **Web UI Deployment** - Integrate with backend
-7. ⏳ **Review Queue UI** - Approve/reject flow
-8. ⏳ **Flag Incorrect Info + Feedback** - Per-item "flag incorrect" button + free-text box so the user can report wrong product/name/brand/image/count; Hermes picks the flags up and corrects them
+6. ✅ ~~**Web UI Deployment**~~ - DONE (React served on :3000, container `pantry-web`)
+7. ⏳ **Review Queue UI** - Approve/reject flow (API exists, UI needs work)
+8. ✅ ~~**Flag Incorrect Info + Feedback**~~ - DONE (2026-08-16): per-item flag button + free-text reason, `GET /v1/inventory/flags` for Hermes, resolve endpoint
 9. ⏳ **Full Pantry Project Audit** - Deep review of the pantry project for issues & enhancements (see "Full Project Audit" section below)
 
 ### P2 - Enhanced Experience
@@ -219,7 +219,7 @@ A deep, end-to-end review of the pantry-helper project to surface issues (bugs, 
 16. ⏳ **Allergen Tracking** - Cross-contamination warnings
 17. ⏳ **Supply Forecasting** - Days of food remaining based on consumption
 18. ❌ **Family Member Tracking** - Who took what
-19. ❌ **Recipe Integration** - Suggest recipes based on stock
+19. ⏳ **Recipe Suggestions from Stock** - Recipe CRUD + shopping-needs built (2026-08-14); auto-suggest based on stock not yet
 20. ❌ **Expiry Alerts** - Push notifications for expiring items
 21. ❌ **Shopping Integration** - Order from Instacart/etc
 
@@ -258,6 +258,10 @@ A deep, end-to-end review of the pantry-helper project to surface issues (bugs, 
 | Depletion Estimates | ❌ | "7 days of cereal remaining" |
 | Restock Recommendations | ❌ | Buy before you run out |
 | Meal Planning Integration | ✅ | Weekly plans + verify vs pantry + merge to shopping (2026-08-14) |
+| Meal Plan Verify + HEB Merge | ✅ | `GET /v1/meal-plans/{id}/verify` + `POST /v1/meal-plans/{id}/update-shopping` (2026-08-14) |
+| Inventory Verification Queue | ✅ | `GET /v1/inventory/unverified` + `POST /v1/inventory/{item_id}/verify` (2026-08-14) |
+| HEB Product Enrichment | ✅ | heb.com lookup via camofox automator + `POST /v1/inventory/{item_id}/heb-enrich` (2026-08-14) |
+| Inventory Flag & Feedback | ✅ | Flag button + free-text reason + `GET /v1/inventory/flags` + resolve (2026-08-16) |
 
 ---
 
@@ -273,4 +277,4 @@ A deep, end-to-end review of the pantry-helper project to surface issues (bugs, 
 
 ---
 
-Last Updated: 2026-08-09
+Last Updated: 2026-08-16
