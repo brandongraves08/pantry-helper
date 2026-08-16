@@ -43,16 +43,15 @@ Echo → Alexa skill "Pantry Helper" (Lambda, alexa-hosted)
 - **Backend endpoint** — `POST /v1/shopping-list/items` (schema `VoiceShoppingAdd`; service `add_voice_item` in `services/shopping.py`). Verified live: free-text "Coconut Water" → row created (reason `voice`); same item again → quantity bumped (dedupe); "Black Beans" → linked to the tracked inventory item. Deployed, commit `cf144bf`.
 - **Public HTTPS endpoint** — Cloudflare Tunnel `pantry-voice` (TID `45cfff98-ec13-42d2-8ab5-0adfc332281e`) → CT202:8000, DNS `pantry-voice.graveystudios.com`, systemd `pantry-tunnel` on CT202 (cloudflared 2026.8.2, ingress RESTRICTED to path `/v1/shopping-list/items*`; everything else 404s at the tunnel). Verified from public internet: no token → 401, token → 200, `/v1/shopping-list` → 404, `/health` → 404. Scoped CF token `pantry-voice-tunnel-*` minted (Tunnel Write + DNS Write); old `voicelab` tunnel token was stale — do NOT reuse.
 - **Alexa skill created** — **"Pantry Helper"** in the dev console, ID `amzn1.ask.skill.76d59d51-9e10-4b3c-843f-7e449e243328`. Custom model, Alexa-hosted (Node.js), US East (N. Virginia), Start from Scratch template. Dev-account login works via the Camofox shared-browser session (same Amazon account as the cart automation — warm session, no fresh auth wall).
+- **Interaction model built** — invocation **"pantry helper"**, `AddItemIntent` with `ItemName` (custom `FOOD_ITEM` slot, 98 values) + `Quantity` (`AMAZON.NUMBER`), 14 sample utterances. Built 12:22 PM, 0 errors/warnings.
+- **Lambda handler deployed** — `index.js` reads `PANTRY_ENDPOINT` + `PANTRY_API_TOKEN` (env var w/ fallback constant), POSTs to `/v1/shopping-list/items`, speaks "Added {qty} {item}...". Container-word normalization ("3 cans of black beans" → "black beans"), leading-number qty, Launch/Help/Stop/Cancel/SessionEnded + error handlers. Deployment Successful verified.
+- **Simulator E2E PASSED** — "open pantry helper" → welcome; "add apples to the pantry list" → "Added apples..." AND row landed in shopping list (`apples x1 | voice`); "add 3 cans of black beans" → "Added 3 black beans..." (normalized). Test stage enabled (the "Test is disabled" toggle is a react-select — click `.Select-control`, pick **Development**).
 
-### ⏳ Remaining (ordered)
+### ⏳ Remaining
 
 | # | Step | Detail | Effort |
 |---|------|--------|--------|
-| A | **Interaction model** | In the dev console → Interaction Model → JSON Editor: add intent `AddItemIntent` (or `AddToPantry`) with slot `ItemName` (custom slot type w/ pantry food values + free-text fallback `AMAZON.SearchQuery` optional) and optional `Quantity` (`AMAZON.NUMBER`). Sample utterances: "add {ItemName} to the pantry list", "add {ItemName} to the shopping list", "put {ItemName} on the list", "add {Quantity} {ItemName} to the pantry list". | M (console JSON) |
-| B | **Lambda code** | Replace Hello World handler: `AddItemIntent` → parse slots → `fetch` POST to `https://pantry-voice.graveystudios.com/v1/shopping-list/items` with `Authorization: Bearer <token>` → speak "Added {quantity} {item} to your shopping list" / error response. Handle LaunchRequest + Help/Stop/Cancel. | M |
-| C | **Token in env** | Store `PANTRY_API_TOKEN` in the Alexa-hosted Lambda env vars (never hardcode in code). Token lives on CT202 `.env` / container env. | S |
-| D | **Save + build + deploy** | Save interaction model, Build the skill (catches model errors), deploy Lambda code. Verify via the Alexa simulator: type "open pantry helper" → "add apples to the pantry list" → confirm 200 + row in shopping list. | M |
-| E | **Echo enable + live test** | Enable the skill on the household Echo (dev skills are only testable via the dev account by default — may need "skills you have enabled" toggle / beta test group if it must run on the family's device), say the phrase for real, verify the HEB order picks it up. | S (needs Echo access) |
+| E | **Echo enable + live test** | The skill is in development stage — usable by the dev account. For the household Echo: either keep it dev-stage (enable testing on linked devices for Brandon's account) or publish/certify for the family. Say the phrase for real, verify the HEB order picks it up. | S (needs Echo access) |
 | F | **Polish** | Friendly responses ("Added 2 apples. Anything else?"), multi-item ("add milk and eggs"), remove-by-voice ("take bananas off the list"), quantity normalization ("half a dozen"). Post-launch. | L |
 
 ### 🔒 Security posture (deliberate)
@@ -60,13 +59,17 @@ Echo → Alexa skill "Pantry Helper" (Lambda, alexa-hosted)
 - Tunnel exposes ONLY `/v1/shopping-list/items` — no inventory/shopping-list reads, no meal plans, no flags. Everything else 404s at the edge.
 - Write auth is Bearer-protected; the skill is the only public caller.
 - CF tunnel token is scoped (Tunnel Write + DNS Write on the graveystudios zone); the tunnel itself has no public admin surface.
+- **NOTE:** the Alexa-hosted Lambda bundle contains the pantry token as a fallback constant. It lives server-side in the private skill bundle (not exposed to skill users) — acceptable for a single-household skill. If this ever goes public/certified, move the token to a Lambda env var and strip the constant.
 - Consider an Alexa skill permissions page / account linking later if we ever want per-user voice identity. Not needed for a single-household list.
 
 ### 📌 Session notes (for resuming)
 
-- Skill dashboard tab is open in Camofox `shared-browser` (tab id `958be351-7d70-499c-bd1a-10cb09b3ce33`); the dev console session may be reaped by the idle reaper — re-login via the amazon-cart-automation recipe if needed (2FA → SMS to phone-561, Brandon reads the code).
-- Driving the console: use Camofox native click with shadow-piercing selectors (`section.astro-card:has-text(...)`, `button.astro__button--primary`) — synthetic `el.click()` through evaluate resets the wizard. Snapshot endpoint (`/tabs/{id}/snapshot?userId=shared-browser&format=semantic`) gives refs (eN) for reliable clicks.
-- The Alexa-hosted runtime is `nodejs16.x` on the template URL — fine for a simple fetch handler; don't upgrade runtime without testing.
+- Skill dashboard tab in Camofox `shared-browser` (tab id `4020eed6-0cde-486e-99e5-a6a564d30f78` — re-create via POST /tabs if reaped; the dev console session may need re-login via the amazon-cart-automation recipe, 2FA → SMS to phone-561).
+- Driving the console: use Camofox native click with shadow-piercing selectors (`section.astro-card:has-text(...)`, `button.astro__button--primary`, `div.Select-control`) — synthetic `el.click()` through evaluate resets the wizard. Snapshot endpoint (`/tabs/{id}/snapshot?userId=shared-browser&format=semantic`) gives refs (eN) for reliable clicks. The JSON editor + code editor are ACE — set content via `ace.edit(el).setValue(JSON.stringify(model,null,2))` with the model embedded as a JS object.
+- The "Test is disabled" toggle is a react-select, not a native select: native click `div.Select-control:has-text("Off")` → then click `[role=option]:has-text("Development")`. Test stage must be Development.
+- The Integrate button opens an AWS-resource-linking modal (NOT env vars); env vars for Alexa-hosted skills live elsewhere — the fallback constant in index.js works for a private skill.
+- The Alexa-hosted runtime is `nodejs16.x` — fine for the handler; don't upgrade runtime without testing.
+- `index.js` source for the skill lives at `/tmp/pantry_index_final.js` on hermes-01 (the deployed copy).
 
 ---
 
@@ -124,7 +127,7 @@ Echo → Alexa skill "Pantry Helper" (Lambda, alexa-hosted)
 - ✅ Auth on writes + rate limiting
 - ✅ Meal planning → HEB order flow (the flagship feature)
 - ✅ Flag & feedback loop closed (08-16)
-- 🎙 Alexa voice → shopping list: endpoint + tunnel + skill scaffold done (08-16); model/code/deploy/Echo pending (P0)
+- ✅ **Alexa voice → shopping list: E2E PASSED in simulator** (08-16) — skill live, model built, Lambda deployed, apples + beans landed in the DB. Echo enable + live-test pending (step E)
 - ➖ Tests (0 backend) — P2
 - ➖ Expiry OCR — P2
 - ➖ Push alerts — P1 #2
@@ -133,7 +136,7 @@ Echo → Alexa skill "Pantry Helper" (Lambda, alexa-hosted)
 
 ## 🗓 Cadence
 
-- **P0 right now** — finish the Alexa track: interaction model → Lambda → deploy → simulator test → Echo enable. (Next session picks up at step A in the Alexa section.)
+- **P0 right now** — Alexa track is at step E: Echo enable + live test. After that, P1 (alerts, allergen warnings, recipe suggestions).
 - **Daily 6pm CT** — pantry verification loop (Hermes cron) — working through unverified items.
 - **Daily 4am CT** — HEB enrichment automator (silent when nothing pending).
 - **Weekly** — check `GET /v1/inventory/flags` open queue + pending HEB items; work the plan above on-demand.
