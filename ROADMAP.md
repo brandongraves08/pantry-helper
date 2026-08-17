@@ -87,9 +87,9 @@ Echo → Alexa skill "Pantry Helper" (Lambda, alexa-hosted)
 
 | # | Item | Why | Rough effort |
 |---|------|-----|--------------|
-| 5 | **Supply forecasting** | `consumption_events` table exists but nothing writes it. Hook verify/meal-plan consumption → depletion estimates ("~7 days of cereal"). | L (data model + writes + UI) |
-| 6 | **Backend test suite (pytest)** — ✅ **45 tests passing** (08-17): parse_quantity (34), recipe suggestions (4), allergen warnings (3), household API (4). 7 pre-existing failures in old Aug 8 tests (rate limit, admin stats). | M |
-| 7 | **Expiry OCR** | Vision pipeline could parse dates off labels; currently expiry is manual. Nice-to-have while the camera flow is dormant. | M |
+| 5 | **Supply forecasting** — ✅ **Deployed** (08-17). `GET /v1/inventory/supply-forecast` calculates days-until-empty from `consumption_events` (configurable window). `POST /v1/consumption` logs events. Items sorted critical→low→depleting→stable→no_data. |
+| 6 | **Backend test suite (pytest)** — ✅ **54 tests passing** (08-17): parse_quantity (34), recipe suggestions (4), allergen warnings (3), household API (4), supply forecast (9). |
+| 7 | **Expiry OCR** — ✅ **Wired** (08-17). Vision pipeline's `expiry_date` now flows through detection approval into `inventory_state.expires_at` automatically. |
 
 ### P3 — Parked / separate tracks
 
@@ -127,7 +127,7 @@ Echo → Alexa skill "Pantry Helper" (Lambda, alexa-hosted)
 - ✅ Alexa voice → shopping list: E2E PASSED in simulator (08-16) — skill live, model built, Lambda deployed, apples + beans landed in the DB. Echo enable pending (needs linked-device test)
 - ✅ P1-1: Expiry/low-stock Discord alerts watcher — script runs daily 08:00 CT, posts to #alerts when thresholds crossed. Verified live 2026-08-16 (14 low-stock items). Job ID a89077f0d82f.
 - ✅ Tests (45 passing) — P2 ✅ (08-17)
-- ➖ Expiry OCR — P2
+- ✅ Expiry OCR — P2 ✅ (wired 08-17)
 - ✅ Push alerts — P1
 - ✅ Meal-plan allergen warnings — P1 ✅ (deployed + verified 08-17)
 - ✅ Recipe suggestions from stock — P1 ✅ (deployed + verified 08-17)
