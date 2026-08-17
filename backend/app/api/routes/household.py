@@ -23,36 +23,11 @@ class MemberUpdate(BaseModel):
     is_active: Optional[bool] = None
 
 
-class MemberResponse(BaseModel):
-    id: str
-    name: str
-    relationship: Optional[str]
-    birth_date: Optional[str]
-    is_active: bool
-    created_at: str
-
-    class Config:
-        from_attributes = True
-
-
 class RestrictionCreate(BaseModel):
     restriction_type: str = Field(..., description="allergy, intolerance, preference, medical")
     allergen: Optional[str] = None
     severity: Optional[str] = Field(None, description="mild, moderate, severe, life_threatening")
     notes: Optional[str] = None
-
-
-class RestrictionResponse(BaseModel):
-    id: str
-    member_id: str
-    restriction_type: str
-    allergen: Optional[str]
-    severity: Optional[str]
-    notes: Optional[str]
-    created_at: str
-
-    class Config:
-        from_attributes = True
 
 
 class NutritionTargetCreate(BaseModel):
@@ -64,26 +39,48 @@ class NutritionTargetCreate(BaseModel):
     notes: Optional[str] = None
 
 
-class NutritionTargetResponse(BaseModel):
-    id: str
-    member_id: str
-    daily_calories: Optional[int]
-    daily_protein_g: Optional[float]
-    daily_carbs_g: Optional[float]
-    daily_fat_g: Optional[float]
-    daily_fiber_g: Optional[float]
-    notes: Optional[str]
-    updated_at: str
+def _member_dict(m: HouseholdMember) -> dict:
+    return {
+        "id": m.id,
+        "name": m.name,
+        "relationship": getattr(m, "member_relationship", None),
+        "birth_date": str(m.birth_date) if m.birth_date else None,
+        "is_active": m.is_active,
+        "created_at": str(m.created_at),
+    }
 
-    class Config:
-        from_attributes = True
+
+def _restriction_dict(r: DietaryRestriction) -> dict:
+    return {
+        "id": r.id,
+        "member_id": r.member_id,
+        "restriction_type": r.restriction_type,
+        "allergen": r.allergen,
+        "severity": r.severity,
+        "notes": r.notes,
+        "created_at": str(r.created_at),
+    }
+
+
+def _nutrition_dict(t: NutritionTarget) -> dict:
+    return {
+        "id": t.id,
+        "member_id": t.member_id,
+        "daily_calories": t.daily_calories,
+        "daily_protein_g": t.daily_protein_g,
+        "daily_carbs_g": t.daily_carbs_g,
+        "daily_fat_g": t.daily_fat_g,
+        "daily_fiber_g": t.daily_fiber_g,
+        "notes": t.notes,
+        "updated_at": str(t.updated_at),
+    }
 
 
 # Map Pydantic field names → SQLAlchemy column names
 _FIELD_MAP = {"relationship": "member_relationship"}
 
 
-@router.post("/members", response_model=MemberResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/members", status_code=status.HTTP_201_CREATED)
 def create_member(member_data: MemberCreate, db: Session = Depends(get_db)):
     """Add a new household member"""
     member = HouseholdMember(
@@ -94,28 +91,28 @@ def create_member(member_data: MemberCreate, db: Session = Depends(get_db)):
     db.add(member)
     db.commit()
     db.refresh(member)
-    return member
+    return _member_dict(member)
 
 
-@router.get("/members", response_model=List[MemberResponse])
+@router.get("/members")
 def list_members(active_only: bool = True, db: Session = Depends(get_db)):
     """List all household members"""
     query = db.query(HouseholdMember)
     if active_only:
         query = query.filter(HouseholdMember.is_active == True)
-    return query.all()
+    return [_member_dict(m) for m in query.all()]
 
 
-@router.get("/members/{member_id}", response_model=MemberResponse)
+@router.get("/members/{member_id}")
 def get_member(member_id: str, db: Session = Depends(get_db)):
     """Get a specific household member"""
     member = db.query(HouseholdMember).filter_by(id=member_id).first()
     if not member:
         raise HTTPException(status_code=404, detail="Member not found")
-    return member
+    return _member_dict(member)
 
 
-@router.patch("/members/{member_id}", response_model=MemberResponse)
+@router.patch("/members/{member_id}")
 def update_member(member_id: str, update_data: MemberUpdate, db: Session = Depends(get_db)):
     """Update household member details"""
     member = db.query(HouseholdMember).filter_by(id=member_id).first()
@@ -128,7 +125,7 @@ def update_member(member_id: str, update_data: MemberUpdate, db: Session = Depen
 
     db.commit()
     db.refresh(member)
-    return member
+    return _member_dict(member)
 
 
 @router.delete("/members/{member_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -143,7 +140,7 @@ def deactivate_member(member_id: str, db: Session = Depends(get_db)):
     return None
 
 
-@router.post("/members/{member_id}/restrictions", response_model=RestrictionResponse)
+@router.post("/members/{member_id}/restrictions")
 def add_restriction(member_id: str, restriction_data: RestrictionCreate, db: Session = Depends(get_db)):
     """Add a dietary restriction/allergy for a member"""
     member = db.query(HouseholdMember).filter_by(id=member_id).first()
@@ -160,26 +157,25 @@ def add_restriction(member_id: str, restriction_data: RestrictionCreate, db: Ses
     db.add(restriction)
     db.commit()
     db.refresh(restriction)
-    return restriction
+    return _restriction_dict(restriction)
 
 
-@router.get("/members/{member_id}/restrictions", response_model=List[RestrictionResponse])
+@router.get("/members/{member_id}/restrictions")
 def list_restrictions(member_id: str, db: Session = Depends(get_db)):
     """List dietary restrictions for a member"""
     member = db.query(HouseholdMember).filter_by(id=member_id).first()
     if not member:
         raise HTTPException(status_code=404, detail="Member not found")
-    return member.restrictions
+    return [_restriction_dict(r) for r in member.restrictions]
 
 
-@router.post("/members/{member_id}/nutrition", response_model=NutritionTargetResponse)
+@router.post("/members/{member_id}/nutrition")
 def set_nutrition_target(member_id: str, target_data: NutritionTargetCreate, db: Session = Depends(get_db)):
     """Set nutrition targets for a household member"""
     member = db.query(HouseholdMember).filter_by(id=member_id).first()
     if not member:
         raise HTTPException(status_code=404, detail="Member not found")
 
-    # Update existing or create new
     if member.nutrition_target:
         for field, value in target_data.dict(exclude_unset=True).items():
             setattr(member.nutrition_target, field, value)
@@ -189,10 +185,10 @@ def set_nutrition_target(member_id: str, target_data: NutritionTargetCreate, db:
 
     db.commit()
     db.refresh(member.nutrition_target)
-    return member.nutrition_target
+    return _nutrition_dict(member.nutrition_target)
 
 
-@router.get("/members/{member_id}/nutrition", response_model=NutritionTargetResponse)
+@router.get("/members/{member_id}/nutrition")
 def get_nutrition_target(member_id: str, db: Session = Depends(get_db)):
     """Get nutrition targets for a household member"""
     member = db.query(HouseholdMember).filter_by(id=member_id).first()
@@ -200,4 +196,4 @@ def get_nutrition_target(member_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Member not found")
     if not member.nutrition_target:
         raise HTTPException(status_code=404, detail="No nutrition target set")
-    return member.nutrition_target
+    return _nutrition_dict(member.nutrition_target)
