@@ -76,7 +76,7 @@ class RateLimitStore:
         # in-memory fallback (fixed window)
         now = time.time()
         rec = self._mem.get(key)
-        if rec is None or now - rec[1] >= period:
+        if rec is None or now >= rec[1]:
             self._mem[key] = [now, now + period, 1]
             return 1, 1 <= limit
         self._mem[key][2] += 1

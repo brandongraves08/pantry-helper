@@ -75,7 +75,7 @@ async def get_system_stats(db: Session = Depends(get_db)):
         },
         "rate_limits": {
             "enabled": True,
-            "total_tracked": len(rate_limit_store.requests),
+            "total_tracked": len(getattr(rate_limit_store, "_mem", {})),
         },
     }
 

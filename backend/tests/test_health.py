@@ -1,7 +1,13 @@
-"""Tests for health check endpoint"""
+"""Test health check endpoint."""
+
 
 def test_health_check(client):
-    """Test that health check endpoint works"""
+    """Health check returns 200 with status info."""
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    data = response.json()
+    assert "status" in data
+    assert data["status"] in ("ok", "degraded")  # degraded = Redis down in tests
+    assert "checks" in data
+    assert "database" in data["checks"]
+    assert data["checks"]["database"]["status"] == "ok"
