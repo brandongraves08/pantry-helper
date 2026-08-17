@@ -73,10 +73,15 @@ Echo → Alexa skill "Pantry Helper" (Lambda, alexa-hosted)
 
 ---
 
-## 📋 Next Steps (prioritized — the actual plan)
+### 📋 Next Steps (prioritized — the actual plan)
 
-### P0 — Active now
-1. **Finish the Alexa voice track (A–E above)** — interaction model → Lambda → deploy → simulator test → Echo enable. This is the feature Brandon asked for; everything else waits.
+### P0 — Complete (2026-08-16)
+✅ Alexa voice → shopping list: E2E verified in simulator and live Echo test (user confirmed "Alexa, ask pantry helper to add beans to the shopping list" works). Skill is built, Lambda deployed, model built, and alerts watcher shipped.
+
+### P1 — Active now (high value, low effort)
+1. **Expiry/low-stock alerts to Discord** — `expires_at` + low-stock data already live; UI shows badges but nothing pushes. A small watcher (Hermes cron, no_agent) pings #alerts when items cross 7d-to-expiry or go below par. No app code needed. (Already shipped as job `a89077f0d82f`, runs daily 08:00 CT)
+2. **Meal-plan allergen & nutrition warnings** — Household member routes exist (backend) but the UI is a stub and nothing checks a planned meal against a member's allergens/restrictions. Wire the verify response to warn "contains peanut — wife is allergic." Real family value, uses existing tables.
+3. **Recipe suggestions from stock** — Recipes + inventory both live; "what can I cook with what I have" is the natural next pull. `GET /v1/recipes/suggest?match=on_hand` — score recipes by % ingredients in stock.
 
 ### P1 — High value, low effort (after Alexa ships)
 

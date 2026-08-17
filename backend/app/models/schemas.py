@@ -403,6 +403,7 @@ class MealPlanItemNeed(BaseModel):
     status: str  # ok | short | not_tracked
     approx: bool = False  # True when quantity math is a heuristic (weight/volume units)
     sources: List[dict] = []  # [{date, meal_type, recipe, quantity, servings_multiplier}]
+    allergen_warnings: Optional[List[str]] = None  # Warnings about household allergens
 
 
 class MealPlanVerifyResponse(BaseModel):

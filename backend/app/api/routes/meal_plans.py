@@ -14,6 +14,9 @@ from app.db.models import (
     InventoryState,
     ShoppingListItem as ShoppingListItemModel,
     Recipe as RecipeModel,
+    HouseholdMember as HouseholdMemberModel,
+    DietaryRestriction as DietaryRestrictionModel,
+    ItemAllergen as ItemAllergenModel,
 )
 from app.models.schemas import (
     MealPlanCreate,
@@ -250,8 +253,18 @@ def _aggregate_needs(plan: MealPlanModel, db: Session, min_confidence: float) ->
     Returns (items, summary) where each item is a plain dict:
       key: inventory_item_id (linked) or f"untracked:{name}" (free-text)
       name, quantity, inventory_item_id, inventory_item_name,
-      required_units, available_units, missing_units, status, approx, sources
+      required_units, available_units, missing_units, status, approx, sources,
+      allergen_warnings
     """
+    # Get all household members and their allergens for warning lookup
+    member_allergens: dict[str, set[str]] = {}
+    members = db.query(HouseholdMemberModel).all()
+    for member in members:
+        member_allergens[member.id] = set()
+        for dr in member.restrictions:
+            if dr.restriction_type == "allergen" and dr.allergen:
+                member_allergens[member.id].add(dr.allergen.lower().strip())
+
     buckets: dict[str, dict] = {}
 
     for entry in plan.entries:
@@ -276,6 +289,7 @@ def _aggregate_needs(plan: MealPlanModel, db: Session, min_confidence: float) ->
                 "required_units": 0.0,
                 "approx": approx,
                 "sources": [],
+                "allergen_warnings": None,
             })
             if value is None:
                 # Unparseable (to taste, etc.) — count as 1 unit per use, approx
@@ -291,6 +305,21 @@ def _aggregate_needs(plan: MealPlanModel, db: Session, min_confidence: float) ->
                 "quantity": ing.quantity,
                 "servings_multiplier": mult,
             })
+            
+            # Check for allergens in this ingredient
+            if ing.inventory_item_id:
+                # Query allergens for this inventory item
+                allergens = db.query(ItemAllergenModel).filter(
+                    ItemAllergenModel.inventory_item_id == ing.inventory_item_id,
+                    ItemAllergenModel.is_present == True
+                ).all()
+                member_warnings = []
+                for member_id, allergens_set in member_allergens.items():
+                    for allergen in allergens:
+                        if allergen.allergen.lower().strip() in allergens_set:
+                            member_warnings.append(f"Contains {allergen.allergen} - {member_id} allergic")
+                if member_warnings:
+                    bucket["allergen_warnings"] = member_warnings
 
     # Resolve stock for linked items
     items = []
