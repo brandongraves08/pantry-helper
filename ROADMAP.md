@@ -79,17 +79,9 @@ Echo → Alexa skill "Pantry Helper" (Lambda, alexa-hosted)
 ✅ Alexa voice → shopping list: E2E verified in simulator and live Echo test (user confirmed "Alexa, ask pantry helper to add beans to the shopping list" works). Skill is built, Lambda deployed, model built, and alerts watcher shipped.
 
 ### P1 — Active now (high value, low effort)
-1. **Expiry/low-stock alerts to Discord** — `expires_at` + low-stock data already live; UI shows badges but nothing pushes. A small watcher (Hermes cron, no_agent) pings #alerts when items cross 7d-to-expiry or go below par. No app code needed. (Already shipped as job `a89077f0d82f`, runs daily 08:00 CT)
-2. **Meal-plan allergen & nutrition warnings** — Household member routes exist (backend) but the UI is a stub and nothing checks a planned meal against a member's allergens/restrictions. Wire the verify response to warn "contains peanut — wife is allergic." Real family value, uses existing tables.
-3. **Recipe suggestions from stock** — Recipes + inventory both live; "what can I cook with what I have" is the natural next pull. `GET /v1/recipes/suggest?match=on_hand` — score recipes by % ingredients in stock.
-
-### P1 — High value, low effort (after Alexa ships)
-
-| # | Item | Why | Rough effort |
-|---|------|-----|--------------|
-| 2 | **Expiry/low-stock alerts to Discord** | `expires_at` + low-stock data already live; UI shows badges but nothing pushes. A small watcher (Hermes cron, no_agent) pings #alerts when items cross 7d-to-expiry or go below par. No app code needed. | S (script + cron) |
-| 3 | **Meal-plan allergen & nutrition warnings** | Household member routes exist (backend) but the UI is a stub and nothing checks a planned meal against a member's allergens/restrictions. Wire the verify response to warn "contains peanut — wife is allergic." Real family value, uses existing tables. | M (backend verify + UI) |
-| 4 | **Recipe suggestions from stock** | Recipes + inventory both live; "what can I cook with what I have" is the natural next pull. `GET /v1/recipes/suggest?match=on_hand` — score recipes by % ingredients in stock. | M |
+1. **Expiry/low-stock alerts to Discord** — ✅ Shipped (job `a89077f0d82f`, daily 08:00 CT)
+2. **Meal-plan allergen & nutrition warnings** — ✅ Code written + committed (`ce601dc`). Cross-checks `item_allergens` against household `dietary_restrictions` in the verify endpoint. **Needs deploy to CT202 when it comes back online.**
+3. **Recipe suggestions from stock** — ✅ Code written + committed (`bd31c9a`). `GET /v1/recipes/suggest` scores recipes by % ingredients in stock. **Needs deploy to CT202 when it comes back online.**
 
 ### P2 — Next tier (after P1)
 
@@ -137,12 +129,15 @@ Echo → Alexa skill "Pantry Helper" (Lambda, alexa-hosted)
 - ➖ Tests (0 backend) — P2
 - ➖ Expiry OCR — P2
 - ✅ Push alerts — P1
+- ✅ Meal-plan allergen warnings — P1 (committed, awaiting CT202 deploy)
+- ✅ Recipe suggestions from stock — P1 (committed, awaiting CT202 deploy)
 
 ---
 
 ## 🗓 Cadence
 
-- **P0 right now** — Alexa track is complete on our side: interaction model built, Lambda deployed, simulator verified (one-shot works), roadmap updated. **Remaining: you say the phrase on a linked Echo** (skill is dev-stage, so it works on your devices with testing enabled).
+- **P0 right now** — P1 features all coded. **Blocker: CT202 is unreachable** (VM/container down on proxmox-02). Deploy P1-2 + P1-3 together when it comes back. Then P2 (tests, supply forecasting, expiry OCR).
 - **Daily 6pm CT** — pantry verification loop (Hermes cron) — working through unverified items.
+- **Daily 8am CT** — pantry alerts watcher (Discord #alerts) — expired/expiring + low-stock.
 - **Daily 4am CT** — HEB enrichment automator (silent when nothing pending).
 - **Weekly** — check `GET /v1/inventory/flags` open queue + pending HEB items; work the plan above on-demand.
