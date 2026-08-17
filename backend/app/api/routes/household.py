@@ -79,12 +79,16 @@ class NutritionTargetResponse(BaseModel):
         from_attributes = True
 
 
+# Map Pydantic field names → SQLAlchemy column names
+_FIELD_MAP = {"relationship": "member_relationship"}
+
+
 @router.post("/members", response_model=MemberResponse, status_code=status.HTTP_201_CREATED)
 def create_member(member_data: MemberCreate, db: Session = Depends(get_db)):
     """Add a new household member"""
     member = HouseholdMember(
         name=member_data.name,
-        relationship=member_data.relationship,
+        member_relationship=member_data.relationship,
         birth_date=member_data.birth_date
     )
     db.add(member)
@@ -119,7 +123,8 @@ def update_member(member_id: str, update_data: MemberUpdate, db: Session = Depen
         raise HTTPException(status_code=404, detail="Member not found")
 
     for field, value in update_data.dict(exclude_unset=True).items():
-        setattr(member, field, value)
+        db_field = _FIELD_MAP.get(field, field)
+        setattr(member, db_field, value)
 
     db.commit()
     db.refresh(member)
