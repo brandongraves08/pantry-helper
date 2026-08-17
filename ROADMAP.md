@@ -80,8 +80,8 @@ Echo → Alexa skill "Pantry Helper" (Lambda, alexa-hosted)
 
 ### P1 — Active now (high value, low effort)
 1. **Expiry/low-stock alerts to Discord** — ✅ Shipped (job `a89077f0d82f`, daily 08:00 CT)
-2. **Meal-plan allergen & nutrition warnings** — ✅ Code written + committed (`ce601dc`). Cross-checks `item_allergens` against household `dietary_restrictions` in the verify endpoint. **Needs deploy to CT202 when it comes back online.**
-3. **Recipe suggestions from stock** — ✅ Code written + committed (`bd31c9a`). `GET /v1/recipes/suggest` scores recipes by % ingredients in stock. **Needs deploy to CT202 when it comes back online.**
+2. **Meal-plan allergen & nutrition warnings** — ✅ **Deployed + verified** (08-17). Create household members with allergies, add `item_allergens` for inventory items. `GET /v1/meal-plans/{id}/verify` now returns `allergen_warnings` per ingredient. Commit `3f7baf3`.
+3. **Recipe suggestions from stock** — ✅ **Deployed + verified** (08-17). `GET /v1/recipes/suggest` scores recipes by % linked ingredients in stock. Sorted by match. Commit `bd31c9a`.
 
 ### P2 — Next tier (after P1)
 
@@ -129,14 +129,14 @@ Echo → Alexa skill "Pantry Helper" (Lambda, alexa-hosted)
 - ➖ Tests (0 backend) — P2
 - ➖ Expiry OCR — P2
 - ✅ Push alerts — P1
-- ✅ Meal-plan allergen warnings — P1 (committed, awaiting CT202 deploy)
-- ✅ Recipe suggestions from stock — P1 (committed, awaiting CT202 deploy)
+- ✅ Meal-plan allergen warnings — P1 ✅ (deployed + verified 08-17)
+- ✅ Recipe suggestions from stock — P1 ✅ (deployed + verified 08-17)
 
 ---
 
 ## 🗓 Cadence
 
-- **P0 right now** — P1 features all coded. **Blocker: CT202 is unreachable** (VM/container down on proxmox-02). Deploy P1-2 + P1-3 together when it comes back. Then P2 (tests, supply forecasting, expiry OCR).
+- **P0 right now** — P1 fully deployed. Next: P2 (backend tests, supply forecasting, expiry OCR). Or tackle the pre-existing household member creation bug (500 on POST /v1/household/members — the API works but the creation endpoint has a relationship keyword error).
 - **Daily 6pm CT** — pantry verification loop (Hermes cron) — working through unverified items.
 - **Daily 8am CT** — pantry alerts watcher (Discord #alerts) — expired/expiring + low-stock.
 - **Daily 4am CT** — HEB enrichment automator (silent when nothing pending).
