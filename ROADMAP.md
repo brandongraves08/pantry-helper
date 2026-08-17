@@ -88,7 +88,7 @@ Echo → Alexa skill "Pantry Helper" (Lambda, alexa-hosted)
 | # | Item | Why | Rough effort |
 |---|------|-----|--------------|
 | 5 | **Supply forecasting** | `consumption_events` table exists but nothing writes it. Hook verify/meal-plan consumption → depletion estimates ("~7 days of cereal"). | L (data model + writes + UI) |
-| 6 | **Backend test suite (pytest)** | Zero backend tests today; the parse_quantity + verify math are the riskiest code. Lock the heuristics down before more features stack on them. | M |
+| 6 | **Backend test suite (pytest)** — ✅ **45 tests passing** (08-17): parse_quantity (34), recipe suggestions (4), allergen warnings (3), household API (4). 7 pre-existing failures in old Aug 8 tests (rate limit, admin stats). | M |
 | 7 | **Expiry OCR** | Vision pipeline could parse dates off labels; currently expiry is manual. Nice-to-have while the camera flow is dormant. | M |
 
 ### P3 — Parked / separate tracks
@@ -126,7 +126,7 @@ Echo → Alexa skill "Pantry Helper" (Lambda, alexa-hosted)
 - ✅ Flag & feedback loop closed (08-16)
 - ✅ Alexa voice → shopping list: E2E PASSED in simulator (08-16) — skill live, model built, Lambda deployed, apples + beans landed in the DB. Echo enable pending (needs linked-device test)
 - ✅ P1-1: Expiry/low-stock Discord alerts watcher — script runs daily 08:00 CT, posts to #alerts when thresholds crossed. Verified live 2026-08-16 (14 low-stock items). Job ID a89077f0d82f.
-- ➖ Tests (0 backend) — P2
+- ✅ Tests (45 passing) — P2 ✅ (08-17)
 - ➖ Expiry OCR — P2
 - ✅ Push alerts — P1
 - ✅ Meal-plan allergen warnings — P1 ✅ (deployed + verified 08-17)
