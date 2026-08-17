@@ -258,9 +258,11 @@ def _aggregate_needs(plan: MealPlanModel, db: Session, min_confidence: float) ->
     """
     # Get all household members and their allergens for warning lookup
     member_allergens: dict[str, set[str]] = {}
+    member_names: dict[str, str] = {}
     members = db.query(HouseholdMemberModel).all()
     for member in members:
         member_allergens[member.id] = set()
+        member_names[member.id] = member.name
         for dr in member.restrictions:
             if dr.restriction_type == "allergen" and dr.allergen:
                 member_allergens[member.id].add(dr.allergen.lower().strip())
@@ -317,7 +319,8 @@ def _aggregate_needs(plan: MealPlanModel, db: Session, min_confidence: float) ->
                 for member_id, allergens_set in member_allergens.items():
                     for allergen in allergens:
                         if allergen.allergen.lower().strip() in allergens_set:
-                            member_warnings.append(f"Contains {allergen.allergen} - {member_id} allergic")
+                            name = member_names.get(member_id, member_id)
+                            member_warnings.append(f"Contains {allergen.allergen} — {name} is allergic")
                 if member_warnings:
                     bucket["allergen_warnings"] = member_warnings
 
