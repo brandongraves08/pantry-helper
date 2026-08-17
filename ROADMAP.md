@@ -136,7 +136,7 @@ Echo → Alexa skill "Pantry Helper" (Lambda, alexa-hosted)
 
 ## 🗓 Cadence
 
-- **P0 right now** — P1 fully deployed. Next: P2 (backend tests, supply forecasting, expiry OCR). Or tackle the pre-existing household member creation bug (500 on POST /v1/household/members — the API works but the creation endpoint has a relationship keyword error).
+- **P0 right now** — P1 fully deployed + household bug fixed. Next: P2 (backend tests, supply forecasting, expiry OCR).
 - **Daily 6pm CT** — pantry verification loop (Hermes cron) — working through unverified items.
 - **Daily 8am CT** — pantry alerts watcher (Discord #alerts) — expired/expiring + low-stock.
 - **Daily 4am CT** — HEB enrichment automator (silent when nothing pending).
