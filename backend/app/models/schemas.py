@@ -292,6 +292,22 @@ class RecipeListResponse(BaseModel):
     total: int
 
 
+class RecipeSuggestion(BaseModel):
+    """A recipe scored by stock match."""
+    recipe: Recipe
+    total_ingredients: int
+    in_stock: int
+    missing: int
+    not_tracked: int
+    match_pct: float  # 0.0–1.0
+
+
+class RecipeSuggestResponse(BaseModel):
+    """Suggested recipes ranked by what you can cook tonight."""
+    suggestions: List[RecipeSuggestion]
+    inventory_items: int  # total tracked items considered
+
+
 # Device Management Schemas
 
 class DeviceCreate(BaseModel):

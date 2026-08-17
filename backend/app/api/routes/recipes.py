@@ -9,6 +9,8 @@ from app.models.schemas import (
     Recipe as RecipeSchema,
     RecipeListResponse,
     RecipeIngredient as RecipeIngredientSchema,
+    RecipeSuggestion,
+    RecipeSuggestResponse,
 )
 
 router = APIRouter()
@@ -57,6 +59,65 @@ async def list_recipes(
     return RecipeListResponse(
         recipes=[_serialize(r) for r in recipes],
         total=len(recipes),
+    )
+
+
+@router.get("/recipes/suggest", response_model=RecipeSuggestResponse)
+async def suggest_recipes(
+    min_stock: int = 1,
+    db: Session = Depends(get_db),
+):
+    """Suggest recipes ranked by what you can cook tonight.
+
+    Scores each recipe by the percentage of its linked ingredients that are
+    in stock (count_estimate >= min_stock). Unlinked/untracked ingredients
+    count as neither in-stock nor missing — they're a separate bucket.
+    Returns recipes sorted by match_pct descending.
+    """
+    # Pre-compute which inventory items are in stock
+    in_stock: set[str] = set()
+    all_items = db.query(InventoryItem).all()
+    for item in all_items:
+        if item.states:
+            total = sum(s.count_estimate or 0 for s in item.states)
+            if total >= min_stock:
+                in_stock.add(item.id)
+
+    recipes = db.query(RecipeModel).all()
+    suggestions = []
+    for recipe in recipes:
+        ings = recipe.ingredients or []
+        if not ings:
+            continue
+        total = len(ings)
+        stocked = 0
+        missing = 0
+        untracked = 0
+        for ing in ings:
+            if not ing.inventory_item_id:
+                untracked += 1
+            elif ing.inventory_item_id in in_stock:
+                stocked += 1
+            else:
+                missing += 1
+
+        # Score = in-stock / (in-stock + missing); untracked are excluded from denominator
+        tracked = stocked + missing
+        match_pct = stocked / tracked if tracked > 0 else 1.0
+
+        suggestions.append(RecipeSuggestion(
+            recipe=_serialize(recipe),
+            total_ingredients=total,
+            in_stock=stocked,
+            missing=missing,
+            not_tracked=untracked,
+            match_pct=round(match_pct, 2),
+        ))
+
+    suggestions.sort(key=lambda s: (-s.match_pct, -s.in_stock, s.recipe.name))
+    return RecipeSuggestResponse(
+        suggestions=suggestions,
+        inventory_items=len(all_items),
     )
 
 
