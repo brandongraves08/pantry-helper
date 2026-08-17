@@ -319,7 +319,7 @@ async def approve_detection(
         quantity_estimate=detected.get("quantity_estimate"),
         count=count,
         par_level=req.par_level if req else None,
-        expires_at=req.expires_at if req else None,
+        expires_at=(req.expires_at if req and req.expires_at else detected.get("expiry_date")),
     )
 
     return DetectionActionResponse(

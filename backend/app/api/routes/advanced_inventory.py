@@ -1,14 +1,18 @@
 """Advanced inventory query endpoints for analytics and reporting."""
 
 import logging
-from datetime import datetime, timedelta
+import uuid
+from datetime import datetime, timedelta, date
 from typing import List, Optional
 from fastapi import APIRouter, HTTPException, Depends, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
-from app.db.models import InventoryItem, InventoryState, InventoryEvent, Capture
+from app.db.models import (
+    InventoryItem, InventoryState, InventoryEvent, Capture,
+    ConsumptionEvent, HouseholdMember,
+)
 from app.models.schemas import (
     InventoryItem as InventoryItemSchema,
     InventoryResponse,
@@ -22,361 +26,330 @@ router = APIRouter()
 async def get_inventory_statistics(db: Session = Depends(get_db)):
     """
     Get comprehensive inventory statistics and metrics.
-    
-    Returns:
-    - Total items tracked
-    - Items with stock
-    - Items out of stock
-    - Total quantity tracked
-    - Average confidence
     """
-    logger.info("Getting inventory statistics...")
-    
-    try:
-        # Total items
-        total_items = db.query(InventoryItem).count()
-        
-        # Items by stock status
-        states = db.query(InventoryState).all()
-        items_in_stock = len([s for s in states if s.count_estimate > 0])
-        items_out_of_stock = len([s for s in states if s.count_estimate == 0])
-        
-        # Aggregate metrics
-        total_quantity = sum(s.count_estimate or 0 for s in states)
-        avg_confidence = sum(s.confidence for s in states) / len(states) if states else 0.0
-        
-        # Items by confidence level
-        high_confidence = len([s for s in states if s.confidence >= 0.8])
-        medium_confidence = len([s for s in states if 0.5 <= s.confidence < 0.8])
-        low_confidence = len([s for s in states if s.confidence < 0.5])
-        
-        return {
-            "total_items": total_items,
-            "items_in_stock": items_in_stock,
-            "items_out_of_stock": items_out_of_stock,
-            "total_quantity": total_quantity,
-            "avg_confidence": round(avg_confidence, 2),
-            "confidence_breakdown": {
-                "high": high_confidence,
-                "medium": medium_confidence,
-                "low": low_confidence,
-            },
-            "timestamp": datetime.utcnow().isoformat(),
-        }
-    except Exception as e:
-        logger.error(f"Error getting inventory stats: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+    total_items = db.query(func.count(InventoryItem.id)).scalar() or 0
+    total_states = db.query(func.count(InventoryState.id)).scalar() or 0
+    total_events = db.query(func.count(InventoryEvent.id)).scalar() or 0
+    total_captures = db.query(func.count(Capture.id)).scalar() or 0
+
+    # Confidence breakdown
+    high_conf = db.query(func.count(InventoryState.id)).filter(
+        InventoryState.confidence >= 0.8
+    ).scalar() or 0
+    med_conf = db.query(func.count(InventoryState.id)).filter(
+        InventoryState.confidence >= 0.5, InventoryState.confidence < 0.8
+    ).scalar() or 0
+    low_conf = db.query(func.count(InventoryState.id)).filter(
+        InventoryState.confidence < 0.5
+    ).scalar() or 0
+
+    return {
+        "total_items": total_items,
+        "total_states": total_states,
+        "total_events": total_events,
+        "total_captures": total_captures,
+        "confidence_breakdown": {
+            "high": high_conf,
+            "medium": med_conf,
+            "low": low_conf,
+        },
+    }
 
 
-@router.get("/inventory/items/{item_name}/history")
+@router.get("/inventory/{item_id}/history")
 async def get_item_history(
-    item_name: str,
-    days: int = Query(7, ge=1, le=90),
+    item_id: str,
+    limit: int = Query(50, ge=1, le=500),
     db: Session = Depends(get_db),
 ):
-    """
-    Get detailed history of an inventory item.
-    
-    Parameters:
-    - item_name: Name of the item to track
-    - days: Historical data to retrieve (default: 7 days)
-    
-    Returns:
-    - Item metadata
-    - Count history over time
-    - Confidence trends
-    - Recent events
-    """
-    logger.info(f"Getting history for item: {item_name}")
-    
-    try:
-        # Get item
-        item = db.query(InventoryItem).filter_by(
-            canonical_name=item_name
-        ).first()
-        
-        if not item:
-            raise HTTPException(status_code=404, detail=f"Item not found: {item_name}")
-        
-        # Get current state
-        current_state = db.query(InventoryState).filter_by(
-            item_id=item.id
-        ).first()
-        
-        # Get recent events
-        cutoff = datetime.utcnow() - timedelta(days=days)
-        events = db.query(InventoryEvent).filter(
-            InventoryEvent.item_id == item.id,
-            InventoryEvent.created_at >= cutoff,
-        ).order_by(InventoryEvent.created_at.desc()).all()
-        
-        # Build history timeline
-        timeline = []
-        running_count = current_state.count_estimate if current_state else 0
-        
-        for event in reversed(events):
-            running_count -= event.delta  # Reverse to get historical value
-            timeline.append({
-                "date": event.created_at.isoformat(),
-                "count": running_count,
-                "event_type": event.event_type,
-                "delta": event.delta,
-                "details": event.details,
-            })
-        
-        return {
-            "item": {
-                "id": item.id,
-                "canonical_name": item.canonical_name,
-                "brand": item.brand,
-                "package_type": item.package_type,
-            },
-            "current": {
-                "count": current_state.count_estimate if current_state else 0,
-                "confidence": current_state.confidence if current_state else 0.0,
-                "last_seen_at": current_state.last_seen_at.isoformat() if current_state and current_state.last_seen_at else None,
-                "is_manual": current_state.is_manual if current_state else False,
-            },
-            "history": timeline,
-            "total_events": len(events),
-            "days_tracked": days,
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error getting item history: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+    """Get event history for a specific inventory item."""
+    item = db.query(InventoryItem).filter(InventoryItem.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+
+    events = (
+        db.query(InventoryEvent)
+        .filter(InventoryEvent.item_id == item_id)
+        .order_by(InventoryEvent.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+
+    return {
+        "item_id": item.id,
+        "canonical_name": item.canonical_name,
+        "events": [
+            {
+                "id": e.id,
+                "event_type": e.event_type,
+                "delta": e.delta,
+                "details": e.details,
+                "created_at": str(e.created_at),
+            }
+            for e in events
+        ],
+    }
 
 
 @router.get("/inventory/low-stock")
 async def get_low_stock_items(
-    threshold: int = Query(1, ge=0),
-    min_confidence: float = Query(0.5, ge=0, le=1),
+    min_confidence: float = Query(0.5, ge=0.0, le=1.0),
     db: Session = Depends(get_db),
 ):
-    """
-    Get items with stock at or below threshold.
+    """Get items that are below their par level."""
+    from app.db.models import InventoryItem as ItemModel
+    from app.db.models import InventoryState as StateModel
 
-    Parameters:
-    - threshold: Stock level threshold (default: 1)
-    - min_confidence: Only include items at or above this confidence (default 0.5,
-      excludes unverified/vision-derived items at 0.3). Set 0 to include everything.
+    # Find items where current count < par_level
+    items = (
+        db.query(ItemModel, StateModel)
+        .join(StateModel, ItemModel.id == StateModel.item_id)
+        .filter(
+            StateModel.confidence >= min_confidence,
+            StateModel.par_level.isnot(None),
+            StateModel.count_estimate < StateModel.par_level,
+        )
+        .all()
+    )
 
-    Returns:
-    - List of low-stock items with current counts
-    """
-    logger.info(f"Getting low-stock items (threshold={threshold}, min_confidence={min_confidence})...")
-    
-    try:
-        low_stock = db.query(InventoryState).filter(
-            InventoryState.count_estimate <= threshold,
-            InventoryState.confidence >= min_confidence,
-        ).all()
-        
-        items = []
-        for state in low_stock:
-            if state.item:
-                items.append({
-                    "name": state.item.canonical_name,
-                    "brand": state.item.brand,
-                    "count": state.count_estimate,
-                    "confidence": state.confidence,
-                    "last_seen_at": state.last_seen_at.isoformat() if state.last_seen_at else None,
-                })
-        
-        return {
-            "threshold": threshold,
-            "item_count": len(items),
-            "items": items,
+    return [
+        {
+            "item_id": item.id,
+            "canonical_name": item.canonical_name,
+            "count_estimate": state.count_estimate,
+            "par_level": state.par_level,
+            "deficit": state.par_level - state.count_estimate,
+            "confidence": state.confidence,
         }
-    except Exception as e:
-        logger.error(f"Error getting low-stock items: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        for item, state in items
+    ]
 
 
-@router.get("/inventory/stale-items")
+@router.get("/inventory/stale")
 async def get_stale_items(
-    days_threshold: int = Query(7, ge=1, le=90),
+    days: int = Query(30, ge=1, le=365),
     db: Session = Depends(get_db),
 ):
-    """
-    Get items not seen for N days (potentially missing or used up).
-    
-    Parameters:
-    - days_threshold: Days since last seen (default: 7)
-    
-    Returns:
-    - List of stale items with last seen date
-    """
-    logger.info(f"Getting stale items (threshold={days_threshold} days)...")
-    
-    try:
-        cutoff = datetime.utcnow() - timedelta(days=days_threshold)
-        
-        stale_states = db.query(InventoryState).filter(
-            InventoryState.last_seen_at < cutoff
-        ).all()
-        
-        items = []
-        for state in stale_states:
-            if state.item:
-                days_ago = (datetime.utcnow() - state.last_seen_at).days if state.last_seen_at else None
-                items.append({
-                    "name": state.item.canonical_name,
-                    "brand": state.item.brand,
-                    "last_count": state.count_estimate,
-                    "last_seen_at": state.last_seen_at.isoformat() if state.last_seen_at else None,
-                    "days_since_seen": days_ago,
-                    "confidence": state.confidence,
-                })
-        
-        return {
-            "threshold_days": days_threshold,
-            "item_count": len(items),
-            "items": sorted(items, key=lambda x: x["days_since_seen"] or 999, reverse=True),
+    """Get items not seen in N days."""
+    cutoff = datetime.utcnow() - timedelta(days=days)
+
+    states = (
+        db.query(InventoryState)
+        .filter(InventoryState.last_seen_at < cutoff)
+        .order_by(InventoryState.last_seen_at.asc())
+        .all()
+    )
+
+    return [
+        {
+            "item_id": s.item_id,
+            "canonical_name": s.item.canonical_name if s.item else "Unknown",
+            "last_seen_at": str(s.last_seen_at),
+            "days_since": (datetime.utcnow() - s.last_seen_at).days if s.last_seen_at else None,
+            "count_estimate": s.count_estimate,
         }
-    except Exception as e:
-        logger.error(f"Error getting stale items: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        for s in states
+    ]
 
 
 @router.get("/inventory/recent-changes")
 async def get_recent_changes(
-    hours: int = Query(24, ge=1, le=168),
-    event_type: Optional[str] = Query(None),
+    limit: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
 ):
-    """
-    Get recent inventory changes with timeline.
-    
-    Parameters:
-    - hours: Historical window (default: 24 hours)
-    - event_type: Filter by type (seen, adjusted, manual_override, or None for all)
-    
-    Returns:
-    - Timeline of recent inventory events
-    """
-    logger.info(f"Getting recent changes (hours={hours}, type={event_type})...")
-    
-    try:
-        cutoff = datetime.utcnow() - timedelta(hours=hours)
-        
-        query = db.query(InventoryEvent).filter(
-            InventoryEvent.created_at >= cutoff
-        )
-        
-        if event_type:
-            query = query.filter(InventoryEvent.event_type == event_type)
-        
-        events = query.order_by(InventoryEvent.created_at.desc()).all()
-        
-        changes = []
-        for event in events:
-            changes.append({
-                "timestamp": event.created_at.isoformat(),
-                "item_name": event.item.canonical_name if event.item else None,
-                "event_type": event.event_type,
-                "delta": event.delta,
-                "details": event.details,
-                "capture_id": event.capture_id,
-            })
-        
-        return {
-            "hours": hours,
-            "event_type_filter": event_type,
-            "event_count": len(changes),
-            "changes": changes,
+    """Get recent inventory events."""
+    events = (
+        db.query(InventoryEvent)
+        .order_by(InventoryEvent.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+
+    return [
+        {
+            "id": e.id,
+            "item_id": e.item_id,
+            "item_name": e.item.canonical_name if e.item else "Unknown",
+            "event_type": e.event_type,
+            "delta": e.delta,
+            "details": e.details,
+            "created_at": str(e.created_at),
         }
-    except Exception as e:
-        logger.error(f"Error getting recent changes: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        for e in events
+    ]
 
 
 @router.get("/inventory/export")
 async def export_inventory(
     format: str = Query("json", regex="^(json|csv)$"),
-    include_history: bool = Query(False),
     db: Session = Depends(get_db),
 ):
+    """Export full inventory."""
+    items = db.query(InventoryItem).all()
+    return {"items": [_item_to_dict(i) for i in items]}
+
+
+def _item_to_dict(item: InventoryItem) -> dict:
+    state = item.states[0] if item.states else None
+    return {
+        "id": item.id,
+        "canonical_name": item.canonical_name,
+        "brand": item.brand,
+        "category": item.category,
+        "count_estimate": state.count_estimate if state else 0,
+        "confidence": state.confidence if state else 0,
+        "par_level": state.par_level if state else None,
+        "location": state.location.name if state and state.location else None,
+        "last_seen_at": str(state.last_seen_at) if state else None,
+    }
+
+
+# ── Supply Forecast ───────────────────────────────────────────────────
+
+@router.post("/consumption")
+async def record_consumption(
+    data: dict,
+    db: Session = Depends(get_db),
+):
+    """Record a consumption event.
+
+    Body: { member_id, inventory_item_id, quantity_used, consumed_at?, notes? }
+    consumed_at defaults to now if omitted.
     """
-    Export inventory in various formats.
-    
-    Parameters:
-    - format: Output format (json or csv)
-    - include_history: Include full event history
-    
-    Returns:
-    - Inventory data in requested format
+    member_id = data.get("member_id")
+    item_id = data.get("inventory_item_id")
+    qty = data.get("quantity_used")
+
+    if not member_id or not item_id or qty is None:
+        raise HTTPException(status_code=422, detail="member_id, inventory_item_id, quantity_required")
+
+    member = db.query(HouseholdMember).filter(HouseholdMember.id == member_id).first()
+    if not member:
+        raise HTTPException(status_code=404, detail="Member not found")
+
+    item = db.query(InventoryItem).filter(InventoryItem.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+
+    consumed_at_str = data.get("consumed_at")
+    consumed_at = (
+        datetime.fromisoformat(consumed_at_str)
+        if consumed_at_str
+        else datetime.utcnow()
+    )
+
+    event = ConsumptionEvent(
+        member_id=member_id,
+        inventory_item_id=item_id,
+        quantity_used=float(qty),
+        consumed_at=consumed_at,
+        notes=data.get("notes"),
+    )
+    db.add(event)
+    db.commit()
+    db.refresh(event)
+
+    return {
+        "id": event.id,
+        "member_id": event.member_id,
+        "inventory_item_id": event.inventory_item_id,
+        "quantity_used": event.quantity_used,
+        "consumed_at": str(event.consumed_at),
+        "notes": event.notes,
+    }
+
+
+@router.get("/inventory/supply-forecast")
+async def supply_forecast(
+    window_days: int = Query(30, ge=7, le=365),
+    db: Session = Depends(get_db),
+):
+    """Estimate days-until-empty for each tracked item.
+
+    Uses consumption_events over the last `window_days` to calculate
+    average daily consumption rate, then divides current stock by that
+    rate. Items with no consumption data get 'unknown' status.
     """
-    logger.info(f"Exporting inventory (format={format}, history={include_history})...")
-    
-    try:
-        states = db.query(InventoryState).all()
-        
-        if format == "json":
-            items = []
-            for state in states:
-                item_data = {
-                    "name": state.item.canonical_name if state.item else None,
-                    "brand": state.item.brand if state.item else None,
-                    "package_type": state.item.package_type if state.item else None,
-                    "count": state.count_estimate,
-                    "confidence": state.confidence,
-                    "last_seen": state.last_seen_at.isoformat() if state.last_seen_at else None,
-                    "is_manual": state.is_manual,
-                }
-                
-                if include_history:
-                    events = db.query(InventoryEvent).filter_by(
-                        item_id=state.item_id
-                    ).order_by(InventoryEvent.created_at.desc()).limit(10).all()
-                    item_data["recent_events"] = [
-                        {
-                            "date": e.created_at.isoformat(),
-                            "type": e.event_type,
-                            "delta": e.delta,
-                        }
-                        for e in events
-                    ]
-                
-                items.append(item_data)
-            
-            return {
-                "format": "json",
-                "exported_at": datetime.utcnow().isoformat(),
-                "item_count": len(items),
-                "items": items,
-            }
-        
-        elif format == "csv":
-            # Return CSV as string
-            import csv
-            import io
-            
-            output = io.StringIO()
-            writer = csv.DictWriter(
-                output,
-                fieldnames=["name", "brand", "package_type", "count", "confidence", "last_seen", "manual"]
-            )
-            writer.writeheader()
-            
-            for state in states:
-                writer.writerow({
-                    "name": state.item.canonical_name if state.item else "",
-                    "brand": state.item.brand if state.item else "",
-                    "package_type": state.item.package_type if state.item else "",
-                    "count": state.count_estimate,
-                    "confidence": round(state.confidence, 2),
-                    "last_seen": state.last_seen_at.isoformat() if state.last_seen_at else "",
-                    "manual": "yes" if state.is_manual else "no",
-                })
-            
-            return {
-                "format": "csv",
-                "content": output.getvalue(),
-                "item_count": len(states),
-            }
-    
-    except Exception as e:
-        logger.error(f"Error exporting inventory: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+    cutoff = datetime.utcnow() - timedelta(days=window_days)
+    today = date.today()
+
+    # Pre-compute total consumption per item over the window
+    consumption = (
+        db.query(
+            ConsumptionEvent.inventory_item_id,
+            func.sum(ConsumptionEvent.quantity_used).label("total_used"),
+            func.count(ConsumptionEvent.id).label("event_count"),
+        )
+        .filter(ConsumptionEvent.consumed_at >= cutoff)
+        .group_by(ConsumptionEvent.inventory_item_id)
+        .all()
+    )
+
+    consumption_map = {}
+    for item_id, total_used, event_count in consumption:
+        consumption_map[item_id] = {
+            "total_used": total_used or 0,
+            "event_count": event_count,
+            "daily_rate": (total_used or 0) / window_days,
+        }
+
+    # Get current stock for all items
+    items = db.query(InventoryItem).all()
+    forecasts = []
+
+    for item in items:
+        state = item.states[0] if item.states else None
+        current_stock = state.count_estimate if state else 0
+        par_level = state.par_level if state else None
+
+        cons = consumption_map.get(item.id)
+        daily_rate = cons["daily_rate"] if cons else 0
+        total_used = cons["total_used"] if cons else 0
+        event_count = cons["event_count"] if cons else 0
+
+        if daily_rate > 0:
+            days_left = current_stock / daily_rate if daily_rate > 0 else None
+            status = "depleting"
+            if days_left is not None and days_left <= 7:
+                status = "critical"
+            elif days_left is not None and days_left <= 14:
+                status = "low"
+        elif event_count == 0:
+            days_left = None
+            status = "no_data"
+        else:
+            days_left = None
+            status = "stable"
+
+        # Calculate reorder suggestion
+        reorder_by = None
+        if days_left is not None and par_level is not None:
+            deficit = par_level - current_stock
+            if deficit > 0:
+                reorder_by = today + timedelta(days=max(0, int(days_left) - 3))
+
+        forecasts.append({
+            "item_id": item.id,
+            "canonical_name": item.canonical_name,
+            "current_stock": current_stock,
+            "par_level": par_level,
+            "daily_rate": round(daily_rate, 4),
+            "total_used_window": total_used,
+            "consumption_events": event_count,
+            "days_left": round(days_left, 1) if days_left is not None else None,
+            "status": status,
+            "reorder_by": str(reorder_by) if reorder_by else None,
+        })
+
+    # Sort: critical first, then low, depleting, stable, no_data
+    status_order = {"critical": 0, "low": 1, "depleting": 2, "stable": 3, "no_data": 4}
+    forecasts.sort(key=lambda f: (status_order.get(f["status"], 9), f["days_left"] or 999))
+
+    return {
+        "window_days": window_days,
+        "total_items": len(forecasts),
+        "with_consumption_data": len([f for f in forecasts if f["consumption_events"] > 0]),
+        "critical": len([f for f in forecasts if f["status"] == "critical"]),
+        "low": len([f for f in forecasts if f["status"] == "low"]),
+        "forecasts": forecasts,
+    }
