@@ -100,15 +100,17 @@ describe('Emergency Plan', () => {
 
   it('renders all cumulative phase labels and their exact totals', () => {
     renderPlan();
-    const phases = screen.getByRole('heading', { name: /four phases to 90 days/i }).closest('section').textContent;
+    const phaseSection = screen.getByRole('heading', { name: /four phases to 90 days/i }).closest('section');
     for (const [label, total] of [
       ['1 · 14 days', '112,000 kcal'], ['2 · 30 days', '240,000 kcal'],
       ['3 · 60 days', '480,000 kcal'], ['4 · 90 days', '720,000 kcal'],
     ]) {
-      expect(phases).toContain(label);
-      expect(phases).toContain(total);
+      const phase = screen.getByRole('checkbox', { name: (name) => name.includes(label) }).closest('label');
+      expect(phaseSection).toContainElement(phase);
+      expect(phase.textContent).toContain(label);
+      expect(phase.textContent).toContain(total);
     }
-    expect(phases).toMatch(/Targets are cumulative/i);
+    expect(phaseSection.textContent).toMatch(/Targets are cumulative/i);
   });
 
   it('distinguishes the stored-water reserve from ongoing replenishment', () => {
