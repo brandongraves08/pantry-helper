@@ -24,6 +24,7 @@ A battery-powered, event-driven pantry inventory system using ESP32 camera, Open
 - **Smart shopping list** — par-driven + meal-plan-driven items merged automatically, ready for your grocery order
 - **Barcode scanning** — lookup + add to inventory
 - **Household profiles** — members, dietary restrictions, nutrition targets
+- **Emergency plan** — standalone 90-day food and water preparedness guide with locally saved checklist progress; plan targets are separate from pantry stock and shopping data
 
 ## Quick Start
 
