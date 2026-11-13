@@ -71,13 +71,68 @@ describe('Emergency Plan', () => {
     for (const excluded of ['lentils', 'jasmine rice', 'chicken', 'turkey']) expect(rotation).not.toContain(excluded);
   });
 
-  it('preserves the approved calorie and water milestones and source caveats', () => {
+  it('renders the household planning basis and estimated 90-day target', () => {
     renderPlan();
     const text = document.body.textContent;
-    for (const value of ['720,000 kcal', '771,500', 'About 96 household days', '112,000 kcal', '113,720 kcal', '240,000 kcal', '480,000 kcal', '165,000 kcal', '59,500 kcal', '64,000 kcal', '48,000 kcal', '60,000 kcal', '76,800 kcal', '63,600 kcal', '43,200 kcal', '20,800 kcal', '38,000 kcal', '33,000 kcal', '15,600 kcal', '15,120 kcal', '9,600 kcal', '17,280 kcal', '14,400 kcal', '19,200 kcal', '8,400 kcal', '16 jars', '12 gal', '28 gal', '56 gal', '120 gal', '240 gal', '360 gal']) {
-      expect(text).toContain(value);
+    expect(text).toContain('Family of four');
+    expect(text).toContain('360 person-days');
+    expect(text).toContain('2,000 calories per person per day');
+    expect(text).toContain('8,000 calories per household day');
+    expect(text).toContain('90 days');
+    expect(text).toContain('720,000 calories for 90 days');
+    expect(text).toContain('720,000 kcal');
+    expect(text).toContain('771,500 kcal');
+    expect(text).toContain('About 96 household days');
+    for (const calories of ['165,000 kcal', '59,500 kcal', '64,000 kcal', '48,000 kcal', '60,000 kcal', '76,800 kcal', '63,600 kcal', '43,200 kcal', '20,800 kcal', '38,000 kcal', '33,000 kcal', '15,600 kcal', '15,120 kcal', '9,600 kcal', '17,280 kcal', '14,400 kcal', '19,200 kcal', '8,400 kcal']) expect(text).toContain(calories);
+  });
+
+  it('renders the complete 14-day no-cook allocation and both target and estimate', () => {
+    renderPlan();
+    const reserve = screen.getByText(/Set aside 112,000 kcal/i).closest('label').textContent;
+    for (const item of [
+      '16 jars peanut butter', '11 lb crackers', '8 lb nuts or seeds', '6 lb dried fruit',
+      '30 cans beans', '24 cans fish', '20 cans fruit', '20 cans vegetables',
+    ]) expect(reserve).toContain(item);
+    expect(reserve).toContain('112,000 kcal');
+    expect(reserve).toContain('113,720 kcal');
+    expect(reserve).toContain('14 household-day portions');
+  });
+
+  it('renders all cumulative phase labels and their exact totals', () => {
+    renderPlan();
+    const phases = screen.getByRole('heading', { name: /four phases to 90 days/i }).closest('section').textContent;
+    for (const [label, total] of [
+      ['1 · 14 days', '112,000 kcal'], ['2 · 30 days', '240,000 kcal'],
+      ['3 · 60 days', '480,000 kcal'], ['4 · 90 days', '720,000 kcal'],
+    ]) {
+      expect(phases).toContain(label);
+      expect(phases).toContain(total);
     }
-    expect(text).toMatch(/estimat/i);
+    expect(phases).toMatch(/Targets are cumulative/i);
+  });
+
+  it('distinguishes the stored-water reserve from ongoing replenishment', () => {
+    renderPlan();
+    const water = screen.getByRole('heading', { name: /water milestones/i }).closest('section').textContent;
+    for (const [coverage, gallons] of [['3 days', '12 gal'], ['7 days', '28 gal'], ['14 days', '56 gal'], ['30 days', '120 gal'], ['60 days', '240 gal'], ['90 days', '360 gal']]) {
+      expect(water).toContain(coverage);
+      expect(water).toContain(gallons);
+    }
+    expect(water).toContain('initial stored-water target');
+    expect(water).toContain('Add 28 gal');
+    expect(water).toContain('another 64 gal beyond the 14-day reserve');
+    expect(water).toContain('184 gal beyond the reserve');
+    expect(water).toContain('304 gal beyond the reserve');
+    expect(water).toContain('Storing all 360 gal would weigh about 3,000 lb');
+    expect(screen.getByText(/14 days · replenish separately/i)).toBeTruthy();
+  });
+
+  it('renders dietary assumptions, allergy and cross-contact guidance, and source citations', () => {
+    renderPlan();
+    const assumptions = screen.getByRole('heading', { name: /planning assumptions & dietary exclusions/i }).closest('section').textContent;
+    for (const phrase of ['milk-free and egg-free', 'Exclude lentils and jasmine rice', 'avoid chicken and turkey', 'roughly 70% familiar foods', '30% dedicated reserve', 'two-week reserve', 'first three days requiring minimal prep water']) expect(assumptions).toContain(phrase);
+    const labels = screen.getByRole('link', { name: /fda allergen labeling guidance/i }).closest('label').textContent;
+    for (const phrase of ['whey', 'casein', 'albumen', 'allergen statements', 'manufacturer cross-contact guidance', 'clean prep surfaces and utensils']) expect(labels).toContain(phrase);
     const citationUrls = [
       'https://www.fda.gov/food/food-allergensgluten-free-guidance-documents-regulatory-information/frequently-asked-questions-food-allergen-labeling-guidance-industry',
       'https://www.cdc.gov/water-emergency/about/how-to-create-and-store-an-emergency-water-supply.html',
@@ -89,5 +144,17 @@ describe('Emergency Plan', () => {
     ];
     const renderedLinks = [...document.querySelectorAll('a')].map((link) => link.href);
     for (const url of citationUrls) expect(renderedLinks).toContain(url);
+  });
+
+  it('renders water storage, refill and treatment instructions', () => {
+    renderPlan();
+    const water = screen.getByRole('heading', { name: /water milestones/i }).closest('section').textContent;
+    for (const phrase of ['1 gallon per person per day', '4 gallons daily', 'sanitized food-grade containers', 'tight lids', 'replace every six months', 'away from heat, sunlight, and chemicals', 'primary refill source and a backup', 'fill and carry containers', 'water-provider alerts', 'Follow utility advisories', 'rolling boil for one minute in Celina', 'chemical contamination', 'printed treatment instructions']) expect(water).toContain(phrase);
+  });
+
+  it('renders food storage, outage and safe-cooking guidance', () => {
+    renderPlan();
+    const safety = screen.getByRole('heading', { name: /storage and cooking safety/i }).closest('section').textContent;
+    for (const phrase of ['cool and dry', 'food-grade dry-good containers', 'first-in/first-out rotation', 'discard damaged cans', 'manual can opener', '40°F or below', 'four hours without power', 'Full freezer: about 48 hours', 'Never taste food', 'approved camp stove outdoors', 'Never use a stove, grill, or generator indoors', '20 feet from doors, windows, and vents', 'Test a week of cooking']) expect(safety).toContain(phrase);
   });
 });
