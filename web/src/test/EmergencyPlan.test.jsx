@@ -27,6 +27,7 @@ describe('Emergency Plan', () => {
     expect(localStorage.getItem('token')).toBeNull();
     expect(localStorage.getItem(STORAGE_KEY)).toBe('[]');
     expect(Object.keys(localStorage)).toEqual([STORAGE_KEY]);
+    expect(document.body.textContent).toContain('These targets are not current pantry stock.');
   });
 
   it('keeps the desktop navigation and page in a horizontal app layout', () => {
@@ -83,6 +84,10 @@ describe('Emergency Plan', () => {
     expect(text).toContain('720,000 kcal');
     expect(text).toContain('771,500 kcal');
     expect(text).toContain('About 96 household days');
+    expect(text).toContain('package sizes and calorie densities are estimates');
+    expect(text).toContain('Estimated food total');
+    expect(text).toContain('food and calorie quantities are estimates to confirm against package labels');
+    expect(text).toContain('These targets are not current pantry stock.');
     for (const calories of ['165,000 kcal', '59,500 kcal', '64,000 kcal', '48,000 kcal', '60,000 kcal', '76,800 kcal', '63,600 kcal', '43,200 kcal', '20,800 kcal', '38,000 kcal', '33,000 kcal', '15,600 kcal', '15,120 kcal', '9,600 kcal', '17,280 kcal', '14,400 kcal', '19,200 kcal', '8,400 kcal']) expect(text).toContain(calories);
   });
 
@@ -109,6 +114,15 @@ describe('Emergency Plan', () => {
       expect(phaseSection).toContainElement(phase);
       expect(phase.textContent).toContain(label);
       expect(phase.textContent).toContain(total);
+    }
+    for (const [label, action] of [
+      ['1 · 14 days', 'Build the ready-to-eat tier first. Buy a manual can opener and work from 12 to 56 gal of stored water.'],
+      ['2 · 30 days', 'Add rice, pasta, dry beans, oil, canned vegetables, and fortified plant beverage. Set up indoor shelving, label dry goods, and document water refill options.'],
+      ['3 · 60 days', 'Add protein variety, canned fruit and vegetables, and the next round of staples. Run a pantry-only week and measure portions, fuel, and water use.'],
+      ['4 · 90 days', 'Close gaps using package calories. Verify the 14-day no-cook reserve, water replenishment, and outdoor cooking setup. Schedule inventory and water checks.'],
+    ]) {
+      const phase = screen.getByRole('checkbox', { name: (name) => name.includes(label) }).closest('label');
+      expect(phase.textContent).toContain(action);
     }
     expect(phaseSection.textContent).toMatch(/Targets are cumulative/i);
   });
@@ -160,9 +174,14 @@ describe('Emergency Plan', () => {
     for (const phrase of [
       'cool and dry',
       'food-grade dry-good containers',
+      'sturdy shelving',
+      'heavy containers low',
+      'labels, dates',
       'first-in/first-out rotation',
       'Inspect cans and discard any that are bulging, leaking, heavily rusted, or deeply dented',
       'manual can opener',
+      'shelf-stable meals accessible',
+      'Refrigerate opened foods and cooked leftovers promptly at 40°F or below',
       '40°F or below',
       'cooler or other safe cold storage',
       'four hours without power',
@@ -181,6 +200,8 @@ describe('Emergency Plan', () => {
       'outlet wattage',
       'appliance draw',
       'available energy',
+      'Test a week of cooking and log fuel and water',
+      'Favor quick oats, pasta, canned beans, and instant potatoes when fuel is limited',
     ]) expect(safety).toContain(phrase);
   });
 });
