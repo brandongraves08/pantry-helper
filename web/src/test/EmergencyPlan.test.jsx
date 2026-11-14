@@ -113,6 +113,68 @@ describe('Emergency Plan', () => {
     for (const calories of ['165,000 kcal', '59,500 kcal', '64,000 kcal', '48,000 kcal', '60,000 kcal', '76,800 kcal', '63,600 kcal', '43,200 kcal', '20,800 kcal', '38,000 kcal', '33,000 kcal', '15,600 kcal', '15,120 kcal', '9,600 kcal', '17,280 kcal', '14,400 kcal', '19,200 kcal', '8,400 kcal']) expect(text).toContain(calories);
   });
 
+  it('binds each food inventory item to its household target and kcal value', () => {
+    renderPlan();
+    const inventory = screen.getByRole('heading', { name: /90-day inventory targets/i }).closest('section');
+    const rows = [
+      ['Long-grain white rice or basmati', '100 lb dry', '165,000 kcal'],
+      ['Rolled or quick oats', '35 lb dry', '59,500 kcal'],
+      ['Egg-free dry pasta', '40 lb', '64,000 kcal'],
+      ['All-purpose flour or plain masa harina', '30 lb', '48,000 kcal'],
+      ['Dry pinto and black beans', '40 lb', '60,000 kcal'],
+      ['Neutral cooking oil', '5 gal total in smaller bottles', '76,800 kcal'],
+      ['Peanut butter or tolerated seed butter', '24 × 16 oz', '63,600 kcal'],
+      ['Tolerated nuts or seeds', '16 lb', '43,200 kcal'],
+      ['Raisins or other dried fruit', '16 lb', '20,800 kcal'],
+      ['Milk- and egg-free crackers', '20 lb', '38,000 kcal'],
+      ['Ready-to-eat canned beans', '100 × 15 oz', '33,000 kcal'],
+      ['Canned beef and pork', '60 × 12 oz', '15,600 kcal'],
+      ['Canned salmon, sardines, or other tolerated fish', '84 × 5 oz', '15,120 kcal'],
+      ['Canned vegetables, diced tomatoes, and plain tomato sauce', '96 × 14–15 oz', '9,600 kcal'],
+      ['Canned fruit', '72 × 14–15 oz', '17,280 kcal'],
+      ['Shelf-stable fortified oat or soy beverage, as tolerated', '36 × 32 fl oz', '14,400 kcal'],
+      ['Milk- and egg-free ready-to-eat cereal', '12 × 16 oz', '19,200 kcal'],
+      ['Plain instant potato flakes', '24 × 4 oz', '8,400 kcal'],
+      ['Iodized salt, baking powder, spices, vinegar, and verified vegetable or beef bouillon', '1 working supply and 1 backup per staple seasoning', '—'],
+    ];
+    for (const [item, target, calories] of rows) {
+      const row = screen.getByText(item, { exact: true }).closest('label');
+      expect(inventory).toContainElement(row);
+      expect(row.textContent).toContain(target);
+      expect(row.textContent).toContain(calories);
+    }
+  });
+
+  it('renders distinct package-calorie, stock-subtraction, tally, and nutrition checks', () => {
+    renderPlan();
+    const assumptions = screen.getByRole('heading', { name: /planning assumptions & dietary exclusions/i }).closest('section').textContent;
+    expect(assumptions).toContain('Original budget placeholders: $750 economy, $1,500 balanced, $2,500 for more variety and convenience, and $4,000 premium.');
+    expect(assumptions).toContain('track water containers, shelving, and fuel separately');
+
+    const inventory = screen.getByRole('heading', { name: /90-day inventory targets/i }).closest('section').textContent;
+    expect(inventory).toContain('packages × servings per package × calories per serving');
+    expect(inventory).toContain('Log calories separately for foods requiring heat and foods served straight from the package');
+    expect(inventory).toContain('Subtract usable food already on hand from each shopping target. Write the actual package calories and best-by dates on the inventory.');
+    expect(inventory).toContain('The estimate leaves about 51,500 kcal of margin.');
+    expect(inventory).toContain('Confirm weekly portions provide enough protein, varied fruit and vegetables, and reliable calcium and vitamin D sources');
+    expect(inventory).toContain('check actual labels for fortification');
+  });
+
+  it('renders practical meal and ongoing stock-rotation guidance', () => {
+    renderPlan();
+    const rotation = screen.getByRole('heading', { name: /sample weekly meal rotation/i }).closest('section').textContent;
+    expect(rotation).toContain('Make flatbread from flour or masa, water, oil, and salt.');
+    expect(rotation).toContain('Use small packages or serve the full package at a meal when refrigeration is unavailable.');
+    expect(rotation).toContain('Use nuts, dried fruit, crackers, or canned fruit for snacks');
+    expect(rotation).toContain('add oil, rice, beans, or peanut butter to meals as needed to meet portions');
+    expect(rotation).toContain('Without safe cooking, use the no-cook bin');
+    expect(rotation).toContain('ready-to-eat canned beans and vegetables at dinner');
+
+    const maintenance = screen.getByRole('heading', { name: /four phases to 90 days/i }).closest('section').textContent;
+    expect(maintenance).toContain('Monthly, move the oldest packages forward and replace what the family used.');
+    expect(maintenance).toContain('After each practice week or outage, update quantities from actual consumption and refresh used stock.');
+  });
+
   it('renders the complete 14-day no-cook allocation and both target and estimate', () => {
     renderPlan();
     const reserve = screen.getByText(/Set aside 112,000 kcal/i).closest('label').textContent;
