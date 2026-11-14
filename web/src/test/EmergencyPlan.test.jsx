@@ -157,6 +157,30 @@ describe('Emergency Plan', () => {
   it('renders food storage, outage and safe-cooking guidance', () => {
     renderPlan();
     const safety = screen.getByRole('heading', { name: /storage and cooking safety/i }).closest('section').textContent;
-    for (const phrase of ['cool and dry', 'food-grade dry-good containers', 'first-in/first-out rotation', 'discard damaged cans', 'manual can opener', '40°F or below', 'four hours without power', 'Full freezer: about 48 hours', 'Never taste food', 'approved camp stove outdoors', 'Never use a stove, grill, or generator indoors', '20 feet from doors, windows, and vents', 'Test a week of cooking']) expect(safety).toContain(phrase);
+    for (const phrase of [
+      'cool and dry',
+      'food-grade dry-good containers',
+      'first-in/first-out rotation',
+      'Inspect cans and discard any that are bulging, leaking, heavily rusted, or deeply dented',
+      'manual can opener',
+      '40°F or below',
+      'cooler or other safe cold storage',
+      'four hours without power',
+      'Full freezer: about 48 hours',
+      'half full: 24 hours',
+      'Never taste food',
+      'approved camp stove outdoors, away from openings, following its operating instructions',
+      'stable surface and approved fuel',
+      'Never use a stove, grill, or generator indoors',
+      '20 feet from doors, windows, and vents',
+      'battery-backed carbon monoxide alarms',
+      'Test a week of cooking',
+      'Follow dry-bean package cooking directions',
+      'potable water',
+      'portable battery or vehicle power',
+      'outlet wattage',
+      'appliance draw',
+      'available energy',
+    ]) expect(safety).toContain(phrase);
   });
 });
