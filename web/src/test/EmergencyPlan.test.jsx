@@ -67,9 +67,30 @@ describe('Emergency Plan', () => {
   it('preserves dietary exclusions in assumptions without reintroducing excluded foods in the meal rotation', () => {
     renderPlan();
     const assumptions = screen.getByRole('heading', { name: /planning assumptions & dietary exclusions/i }).closest('section').textContent.toLowerCase();
-    const rotation = screen.getByRole('heading', { name: /sample weekly meal rotation/i }).closest('section').textContent.toLowerCase();
+    const rotationSection = screen.getByRole('heading', { name: /sample weekly meal rotation/i }).closest('section');
+    const rotation = rotationSection.textContent.toLowerCase();
     for (const excluded of ['lentils', 'jasmine rice', 'chicken', 'turkey', 'milk-free', 'egg-free']) expect(assumptions).toContain(excluded);
-    for (const excluded of ['lentils', 'jasmine rice', 'chicken', 'turkey']) expect(rotation).not.toContain(excluded);
+    const mealsByDay = {
+      Monday: ['Oatmeal with dried fruit', 'Peanut butter, crackers, and canned fruit', 'Beef and bean chili over rice'],
+      Tuesday: ['Peanut butter on skillet flatbread', 'Salmon, crackers, and fruit', 'Pasta with tomato sauce and canned beef'],
+      Wednesday: ['Cinnamon oatmeal with nuts', 'Pinto bean and tomato salad with crackers', 'Black bean and rice burrito bowls with corn'],
+      Thursday: ['Cereal with shelf-stable oat beverage', 'Peanut butter, crackers, and dried fruit', 'Canned salmon with mashed potatoes and green beans'],
+      Friday: ['Peanut butter, canned fruit, and crackers', 'Mashed bean flatbread', 'Bean and vegetable soup with flatbread'],
+      Saturday: ['Oatmeal with nuts and raisins', 'Sardines, crackers, and canned fruit', 'Pork and vegetable rice skillet'],
+      Sunday: ['Milk- and egg-free skillet pancakes', 'Bean and corn salad with crackers', 'Pasta with vegetables and tomato sauce'],
+    };
+    const dayArticles = [...rotationSection.querySelectorAll('article')];
+    expect(dayArticles).toHaveLength(7);
+    for (const [day, meals] of Object.entries(mealsByDay)) {
+      const article = dayArticles.find((node) => node.querySelector('h3')?.textContent === day);
+      expect(article, `rotation contains ${day}`).toBeTruthy();
+      const renderedMeals = [...article.querySelectorAll('dd')].map((node) => node.textContent);
+      expect(renderedMeals).toEqual(meals);
+      const mealText = renderedMeals.join(' ').replace(/milk- and egg-free/gi, '');
+      for (const excluded of [/\blentils\b/i, /\bjasmine rice\b/i, /\bchicken\b/i, /\bturkey\b/i, /\bmilk\b/i, /\beggs?\b/i]) {
+        expect(mealText).not.toMatch(excluded);
+      }
+    }
   });
 
   it('renders the household planning basis and estimated 90-day target', () => {
@@ -88,6 +109,7 @@ describe('Emergency Plan', () => {
     expect(text).toContain('Estimated food total');
     expect(text).toContain('food and calorie quantities are estimates to confirm against package labels');
     expect(text).toContain('These targets are not current pantry stock.');
+    expect(text).toContain('Adjust for actual ages, appetites, activity, and dietary needs before buying in bulk.');
     for (const calories of ['165,000 kcal', '59,500 kcal', '64,000 kcal', '48,000 kcal', '60,000 kcal', '76,800 kcal', '63,600 kcal', '43,200 kcal', '20,800 kcal', '38,000 kcal', '33,000 kcal', '15,600 kcal', '15,120 kcal', '9,600 kcal', '17,280 kcal', '14,400 kcal', '19,200 kcal', '8,400 kcal']) expect(text).toContain(calories);
   });
 
@@ -166,6 +188,9 @@ describe('Emergency Plan', () => {
     renderPlan();
     const water = screen.getByRole('heading', { name: /water milestones/i }).closest('section').textContent;
     for (const phrase of ['1 gallon per person per day', '4 gallons daily', 'sanitized food-grade containers', 'tight lids', 'replace every six months', 'away from heat, sunlight, and chemicals', 'primary refill source and a backup', 'fill and carry containers', 'water-provider alerts', 'Follow utility advisories', 'rolling boil for one minute in Celina', 'chemical contamination', 'printed treatment instructions']) expect(water).toContain(phrase);
+    expect(water).toContain('Keep some in easy-to-carry containers.');
+    expect(water).toContain('follow commercial bottle dates');
+    expect(water).toContain('Allow extra for hot weather, pets, illness, and meals using a lot of water.');
   });
 
   it('renders food storage, outage and safe-cooking guidance', () => {
@@ -188,9 +213,10 @@ describe('Emergency Plan', () => {
       'Full freezer: about 48 hours',
       'half full: 24 hours',
       'Never taste food',
+      'Keep appliance doors closed.',
       'approved camp stove outdoors, away from openings, following its operating instructions',
       'stable surface and approved fuel',
-      'Never use a stove, grill, or generator indoors',
+      'Never use a stove, grill, or generator indoors or in a garage',
       '20 feet from doors, windows, and vents',
       'battery-backed carbon monoxide alarms',
       'Test a week of cooking',
