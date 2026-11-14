@@ -46,6 +46,8 @@ make web-dev                              # UI at :5173
 - `docker-compose up` runs db + redis + backend + celery worker + flower
 - Uses [docker-compose.yml](../docker-compose.yml) with health checks and auto-restart
 
+**Release completion:** A user-facing change is not complete until it is pushed to the intended default branch, deployed to the live service using the verified runbook, and checked through the actual route/UI. Local tests and review do not substitute for publication and runtime verification; preserve existing deployment and safety gates.
+
 ## Critical Patterns & Conventions
 
 **Authentication:**
