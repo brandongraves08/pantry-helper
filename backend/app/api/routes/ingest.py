@@ -1,4 +1,5 @@
 """Ingest routes with structured logging."""
+
 import logging
 from datetime import datetime
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, Request
@@ -28,12 +29,15 @@ async def ingest_image(
     db: Session = Depends(get_db),
     authorization: HTTPAuthorizationCredentials = Depends(security),
 ):
-    logger.info("Ingest request", extra={
-        "device_id": device_id,
-        "trigger_type": trigger_type,
-        "upload_filename": image.filename,
-        "image_size": 0,
-    })
+    logger.info(
+        "Ingest request",
+        extra={
+            "device_id": device_id,
+            "trigger_type": trigger_type,
+            "upload_filename": image.filename,
+            "image_size": 0,
+        },
+    )
 
     # Verify device
     db_device = db.query(Device).filter(Device.id == device_id).first()
@@ -42,14 +46,18 @@ async def ingest_image(
         raise HTTPException(status_code=401, detail="Device not found")
 
     auth_token = authorization.credentials if authorization else token
-    if not auth_token or not TokenManager.verify_token(auth_token, db_device.token_hash):
+    if not auth_token or not TokenManager.verify_token(
+        auth_token, db_device.token_hash
+    ):
         raise HTTPException(status_code=401, detail="Invalid token")
 
     capture_time = datetime.utcnow()
     timestamp_value = captured_at or timestamp
     if timestamp_value:
         try:
-            capture_time = datetime.fromisoformat(timestamp_value.replace("Z", "+00:00"))
+            capture_time = datetime.fromisoformat(
+                timestamp_value.replace("Z", "+00:00")
+            )
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid timestamp format")
 
@@ -83,20 +91,27 @@ async def ingest_image(
     db_device.last_rssi = rssi
     db.commit()
 
-    logger.info("ESP32 capture stored", extra={
-        "capture_id": capture.id,
-        "device_id": device_id,
-        "image_size": len(content),
-        "battery_v": battery_v,
-        "rssi": rssi,
-    })
+    logger.info(
+        "ESP32 capture stored",
+        extra={
+            "capture_id": capture.id,
+            "device_id": device_id,
+            "image_size": len(content),
+            "battery_v": battery_v,
+            "rssi": rssi,
+        },
+    )
 
     try:
         from app.workers.celery_app import process_image_capture
+
         process_image_capture.delay(capture.id)
         logger.info("Capture queued from ESP32", extra={"capture_id": capture.id})
     except Exception as e:
-        logger.error("Failed to queue ESP32 capture", extra={"capture_id": capture.id, "error": str(e)})
+        logger.error(
+            "Failed to queue ESP32 capture",
+            extra={"capture_id": capture.id, "error": str(e)},
+        )
         capture.error_message = f"Analysis queue failed: {e}"
         db.commit()
 
@@ -120,10 +135,13 @@ async def ingest_barcode(
     to submit barcode values directly. The system looks up the barcode and
     optionally auto-adds it to inventory.
     """
-    logger.info("Barcode ingest from device", extra={
-        "device_id": device_id,
-        "barcode": barcode,
-    })
+    logger.info(
+        "Barcode ingest from device",
+        extra={
+            "device_id": device_id,
+            "barcode": barcode,
+        },
+    )
 
     # Verify device
     db_device = db.query(Device).filter(Device.id == device_id).first()
@@ -134,19 +152,22 @@ async def ingest_barcode(
     from app.db.models import BarcodeLookup
 
     # Check cache first
-    existing = db.query(BarcodeLookup).filter(
-        BarcodeLookup.barcode == barcode.strip()
-    ).first()
+    existing = (
+        db.query(BarcodeLookup).filter(BarcodeLookup.barcode == barcode.strip()).first()
+    )
 
     if existing:
         existing.lookup_count = (existing.lookup_count or 1) + 1
         existing.last_lookup_at = datetime.utcnow()
         db.commit()
 
-        logger.info("Barcode found in cache", extra={
-            "barcode": barcode,
-            "product": existing.product_name,
-        })
+        logger.info(
+            "Barcode found in cache",
+            extra={
+                "barcode": barcode,
+                "product": existing.product_name,
+            },
+        )
 
         return {
             "status": "ok",
@@ -172,10 +193,13 @@ async def ingest_barcode(
             db.add(bl)
             db.commit()
 
-            logger.info("Barcode resolved from external lookup", extra={
-                "barcode": barcode,
-                "product": product.product_name,
-            })
+            logger.info(
+                "Barcode resolved from external lookup",
+                extra={
+                    "barcode": barcode,
+                    "product": product.product_name,
+                },
+            )
 
             return {
                 "status": "ok",
@@ -193,10 +217,13 @@ async def ingest_barcode(
         }
 
     except Exception as e:
-        logger.error("Barcode lookup failed", extra={
-            "barcode": barcode,
-            "error": str(e),
-        })
+        logger.error(
+            "Barcode lookup failed",
+            extra={
+                "barcode": barcode,
+                "error": str(e),
+            },
+        )
         return {
             "status": "error",
             "barcode": barcode,

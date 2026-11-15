@@ -4,6 +4,7 @@ Event-driven: fired by inventory changes (capture processed, count overridden).
 Posts to the configured Discord webhook ONLY when items are below par.
 No scheduler, no cron — pantry reacts to its own state.
 """
+
 import json
 import os
 import urllib.request
@@ -64,14 +65,17 @@ def notify_shopping_list(self) -> dict:
             )
         }
         notified = _post_webhook(payload)
-        logger.info("Shopping list notify complete", extra={
-            "below_par": len(items),
-            "recomputed": updated,
-            "notified": notified,
-        })
+        logger.info(
+            "Shopping list notify complete",
+            extra={
+                "below_par": len(items),
+                "recomputed": updated,
+                "notified": notified,
+            },
+        )
         return {"status": "ok", "below_par": len(items), "notified": notified}
     except Exception as exc:
         logger.exception("notify_shopping_list failed", extra={"error": str(exc)})
-        raise self.retry(exc=exc, countdown=min(2 ** self.request.retries, 60))
+        raise self.retry(exc=exc, countdown=min(2**self.request.retries, 60))
     finally:
         db.close()

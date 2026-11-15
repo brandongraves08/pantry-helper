@@ -17,7 +17,9 @@ async def create_review(req: ReviewRequest, db: Session = Depends(get_db)):
     if not cap:
         raise HTTPException(status_code=404, detail="Capture not found")
 
-    review = InventoryReview(capture_id=req.capture_id, status="pending", notes=req.notes)
+    review = InventoryReview(
+        capture_id=req.capture_id, status="pending", notes=req.notes
+    )
     db.add(review)
     db.commit()
     db.refresh(review)
@@ -80,7 +82,11 @@ async def resolve_review(review_id: str, action: str, db: Session = Depends(get_
             task_id = None
 
         if task_id:
-            review.notes = (review.notes or "") + ("\n" if review.notes else "") + f"queued task: {task_id}"
+            review.notes = (
+                (review.notes or "")
+                + ("\n" if review.notes else "")
+                + f"queued task: {task_id}"
+            )
 
         review.status = "approved"
     else:

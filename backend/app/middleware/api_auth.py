@@ -8,6 +8,7 @@ Behavior:
 - If set, a write without a valid `Authorization: Bearer <token>` gets HTTP 401.
 - GET/HEAD/OPTIONS are always allowed (read-only).
 """
+
 import hashlib
 import hmac
 import logging

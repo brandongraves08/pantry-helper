@@ -3,6 +3,7 @@
 from io import BytesIO
 from datetime import datetime
 
+
 def test_ingest_requires_device(client):
     """Test that ingest requires valid device"""
     # Create a fake image
@@ -59,6 +60,7 @@ def test_ingest_valid_device(client, db):
     assert "capture_id" in data
     assert data["message"] is not None
 
+
 def test_ingest_invalid_timestamp(client, db):
     """Test that ingest validates timestamp format"""
     from app.db.models import Device
@@ -89,6 +91,7 @@ def test_ingest_invalid_timestamp(client, db):
     )
     assert response.status_code == 400
     assert "Invalid timestamp format" in response.json()["detail"]
+
 
 def test_ingest_updates_device_last_seen(client, db):
     """Test that ingest updates device metadata"""

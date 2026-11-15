@@ -1,8 +1,12 @@
 """Tests for supply forecast and consumption endpoints."""
+
 import pytest
 from datetime import datetime, timedelta, date
 from app.db.models import (
-    InventoryItem, InventoryState, ConsumptionEvent, HouseholdMember,
+    InventoryItem,
+    InventoryState,
+    ConsumptionEvent,
+    HouseholdMember,
 )
 
 
@@ -11,7 +15,10 @@ def _create_item(db, name, count=5, par=10):
     db.add(item)
     db.flush()
     state = InventoryState(
-        item_id=item.id, count_estimate=count, confidence=1.0, par_level=par,
+        item_id=item.id,
+        count_estimate=count,
+        confidence=1.0,
+        par_level=par,
     )
     db.add(state)
     db.flush()
@@ -31,11 +38,14 @@ class TestRecordConsumption:
         member = _create_member(db)
         db.commit()
 
-        resp = client.post("/v1/consumption", json={
-            "member_id": member.id,
-            "inventory_item_id": item.id,
-            "quantity_used": 1.0,
-        })
+        resp = client.post(
+            "/v1/consumption",
+            json={
+                "member_id": member.id,
+                "inventory_item_id": item.id,
+                "quantity_used": 1.0,
+            },
+        )
         assert resp.status_code == 200
         data = resp.json()
         assert data["quantity_used"] == 1.0
@@ -46,13 +56,16 @@ class TestRecordConsumption:
         member = _create_member(db)
         db.commit()
 
-        resp = client.post("/v1/consumption", json={
-            "member_id": member.id,
-            "inventory_item_id": item.id,
-            "quantity_used": 2.0,
-            "consumed_at": "2026-08-01T12:00:00",
-            "notes": "breakfast",
-        })
+        resp = client.post(
+            "/v1/consumption",
+            json={
+                "member_id": member.id,
+                "inventory_item_id": item.id,
+                "quantity_used": 2.0,
+                "consumed_at": "2026-08-01T12:00:00",
+                "notes": "breakfast",
+            },
+        )
         assert resp.status_code == 200
         assert resp.json()["notes"] == "breakfast"
 
@@ -63,11 +76,14 @@ class TestRecordConsumption:
     def test_record_consumption_bad_member(self, client, db):
         item = _create_item(db, "Milk")
         db.commit()
-        resp = client.post("/v1/consumption", json={
-            "member_id": "nonexistent",
-            "inventory_item_id": item.id,
-            "quantity_used": 1.0,
-        })
+        resp = client.post(
+            "/v1/consumption",
+            json={
+                "member_id": "nonexistent",
+                "inventory_item_id": item.id,
+                "quantity_used": 1.0,
+            },
+        )
         assert resp.status_code == 404
 
 
@@ -91,12 +107,17 @@ class TestSupplyForecast:
 
         # Record 2 consumption events: 1 unit each, 10 days ago and now
         for days_ago in [10, 0]:
-            client.post("/v1/consumption", json={
-                "member_id": member.id,
-                "inventory_item_id": item.id,
-                "quantity_used": 1.0,
-                "consumed_at": (datetime.utcnow() - timedelta(days=days_ago)).isoformat(),
-            })
+            client.post(
+                "/v1/consumption",
+                json={
+                    "member_id": member.id,
+                    "inventory_item_id": item.id,
+                    "quantity_used": 1.0,
+                    "consumed_at": (
+                        datetime.utcnow() - timedelta(days=days_ago)
+                    ).isoformat(),
+                },
+            )
 
         resp = client.get("/v1/inventory/supply-forecast?window_days=30")
         data = resp.json()
@@ -115,12 +136,17 @@ class TestSupplyForecast:
 
         # Record 10 units consumed over 10 days = 1/day, 2 left = 2 days
         for i in range(10):
-            client.post("/v1/consumption", json={
-                "member_id": member.id,
-                "inventory_item_id": item.id,
-                "quantity_used": 1.0,
-                "consumed_at": (datetime.utcnow() - timedelta(days=10 - i)).isoformat(),
-            })
+            client.post(
+                "/v1/consumption",
+                json={
+                    "member_id": member.id,
+                    "inventory_item_id": item.id,
+                    "quantity_used": 1.0,
+                    "consumed_at": (
+                        datetime.utcnow() - timedelta(days=10 - i)
+                    ).isoformat(),
+                },
+            )
 
         resp = client.get("/v1/inventory/supply-forecast")
         forecast = resp.json()["forecasts"][0]
@@ -136,12 +162,17 @@ class TestSupplyForecast:
 
         # Milk: heavy consumption (critical)
         for i in range(10):
-            client.post("/v1/consumption", json={
-                "member_id": member.id,
-                "inventory_item_id": milk.id,
-                "quantity_used": 1.0,
-                "consumed_at": (datetime.utcnow() - timedelta(days=10 - i)).isoformat(),
-            })
+            client.post(
+                "/v1/consumption",
+                json={
+                    "member_id": member.id,
+                    "inventory_item_id": milk.id,
+                    "quantity_used": 1.0,
+                    "consumed_at": (
+                        datetime.utcnow() - timedelta(days=10 - i)
+                    ).isoformat(),
+                },
+            )
 
         resp = client.get("/v1/inventory/supply-forecast")
         statuses = [f["status"] for f in resp.json()["forecasts"]]
@@ -154,12 +185,17 @@ class TestSupplyForecast:
         db.commit()
 
         for i in range(5):
-            client.post("/v1/consumption", json={
-                "member_id": member.id,
-                "inventory_item_id": item.id,
-                "quantity_used": 1.0,
-                "consumed_at": (datetime.utcnow() - timedelta(days=5 - i)).isoformat(),
-            })
+            client.post(
+                "/v1/consumption",
+                json={
+                    "member_id": member.id,
+                    "inventory_item_id": item.id,
+                    "quantity_used": 1.0,
+                    "consumed_at": (
+                        datetime.utcnow() - timedelta(days=5 - i)
+                    ).isoformat(),
+                },
+            )
 
         resp = client.get("/v1/inventory/supply-forecast")
         forecast = resp.json()["forecasts"][0]

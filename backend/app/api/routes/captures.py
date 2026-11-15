@@ -1,4 +1,5 @@
 """Capture routes with structured logging."""
+
 from datetime import datetime
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
@@ -60,11 +61,14 @@ async def create_manual_capture(
     image: UploadFile = File(...),
     db: Session = Depends(get_db),
 ):
-    logger.info("Manual capture initiated", extra={
-        "device_id": device_id,
-        "upload_filename": image.filename,
-        "content_type": image.content_type,
-    })
+    logger.info(
+        "Manual capture initiated",
+        extra={
+            "device_id": device_id,
+            "upload_filename": image.filename,
+            "content_type": image.content_type,
+        },
+    )
 
     device = None
     if device_id:
@@ -84,7 +88,9 @@ async def create_manual_capture(
         )
         db.add(device)
         db.flush()
-        logger.info("Created auto-device for manual capture", extra={"device_id": device.id})
+        logger.info(
+            "Created auto-device for manual capture", extra={"device_id": device.id}
+        )
 
     content = await image.read()
     if not content:
@@ -112,22 +118,31 @@ async def create_manual_capture(
     device.last_seen_at = datetime.utcnow()
     db.commit()
 
-    logger.info("Capture stored", extra={
-        "capture_id": capture.id,
-        "image_size": len(content),
-        "image_path": capture.image_path,
-    })
+    logger.info(
+        "Capture stored",
+        extra={
+            "capture_id": capture.id,
+            "image_size": len(content),
+            "image_path": capture.image_path,
+        },
+    )
 
     try:
         from app.workers.celery_app import process_image_capture
+
         process_image_capture.delay(capture.id)
         logger.info("Capture queued for analysis", extra={"capture_id": capture.id})
     except Exception as task_err:
-        logger.error("Failed to queue analysis task", extra={
-            "capture_id": capture.id,
-            "error": str(task_err),
-        })
-        capture.error_message = f"Queued capture but failed to start analysis: {task_err}"
+        logger.error(
+            "Failed to queue analysis task",
+            extra={
+                "capture_id": capture.id,
+                "error": str(task_err),
+            },
+        )
+        capture.error_message = (
+            f"Queued capture but failed to start analysis: {task_err}"
+        )
         db.commit()
 
     return CaptureResponse(
@@ -173,6 +188,8 @@ async def get_capture_image(capture_id: str, db: Session = Depends(get_db)):
         storage_mgr = get_storage_manager()
         image_path = str(storage_mgr.storage_path / image_path)
     if not os.path.exists(image_path):
-        logger.warning("Image file missing", extra={"capture_id": capture_id, "path": image_path})
+        logger.warning(
+            "Image file missing", extra={"capture_id": capture_id, "path": image_path}
+        )
         raise HTTPException(status_code=404, detail="Image file missing")
     return FileResponse(image_path, media_type="image/jpeg")

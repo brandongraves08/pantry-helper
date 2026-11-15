@@ -3,6 +3,7 @@
 Uses Open Food Facts (free, open, no API key) to look up product info
 from a barcode. Falls back gracefully on network errors or unknown codes.
 """
+
 import logging
 from dataclasses import dataclass, field
 from typing import Optional
@@ -18,6 +19,7 @@ TIMEOUT_SECONDS = 10
 @dataclass
 class BarcodeProduct:
     """Normalized product data from a barcode lookup."""
+
     barcode: str
     product_name: Optional[str] = None
     brand: Optional[str] = None
@@ -50,7 +52,9 @@ def lookup_barcode(barcode: str) -> BarcodeProduct:
         resp = requests.get(url, headers=headers, timeout=TIMEOUT_SECONDS)
         # Open Food Facts returns 404 for unknown barcodes — that's not an error
         if resp.status_code == 404:
-            logger.info("Barcode not found in Open Food Facts", extra={"barcode": clean})
+            logger.info(
+                "Barcode not found in Open Food Facts", extra={"barcode": clean}
+            )
             return result
         resp.raise_for_status()
         data = resp.json()
@@ -58,19 +62,31 @@ def lookup_barcode(barcode: str) -> BarcodeProduct:
         logger.warning("Open Food Facts timeout", extra={"barcode": clean})
         return result
     except requests.ConnectionError as e:
-        logger.warning("Open Food Facts connection error", extra={
-            "barcode": clean, "error": str(e),
-        })
+        logger.warning(
+            "Open Food Facts connection error",
+            extra={
+                "barcode": clean,
+                "error": str(e),
+            },
+        )
         return result
     except requests.RequestException as e:
-        logger.warning("Open Food Facts HTTP error", extra={
-            "barcode": clean, "status_code": resp.status_code if hasattr(resp, "status_code") else "?",
-            "error": str(e),
-        })
+        logger.warning(
+            "Open Food Facts HTTP error",
+            extra={
+                "barcode": clean,
+                "status_code": (
+                    resp.status_code if hasattr(resp, "status_code") else "?"
+                ),
+                "error": str(e),
+            },
+        )
         return result
 
     if data.get("status") != 1:
-        logger.info("Barcode not found in Open Food Facts (status=0)", extra={"barcode": clean})
+        logger.info(
+            "Barcode not found in Open Food Facts (status=0)", extra={"barcode": clean}
+        )
         return result
 
     product = data.get("product") or {}
@@ -100,14 +116,16 @@ def lookup_barcode(barcode: str) -> BarcodeProduct:
     # Allergens
     allergens_tags = product.get("allergens_tags") or []
     result.allergens = [
-        tag.replace("en:", "").replace("-", "_")
-        for tag in allergens_tags
+        tag.replace("en:", "").replace("-", "_") for tag in allergens_tags
     ]
 
-    logger.info("Barcode lookup succeeded", extra={
-        "barcode": clean,
-        "product": result.product_name,
-    })
+    logger.info(
+        "Barcode lookup succeeded",
+        extra={
+            "barcode": clean,
+            "product": result.product_name,
+        },
+    )
     return result
 
 

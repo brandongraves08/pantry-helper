@@ -21,7 +21,7 @@ def test_process_capture_updates_status(db):
     device = Device(id="test-device", name="Test", token_hash="hash")
     db.add(device)
     db.flush()
-    
+
     capture = Capture(
         id="test-capture",
         device_id=device.id,
@@ -32,7 +32,7 @@ def test_process_capture_updates_status(db):
     )
     db.add(capture)
     db.commit()
-    
+
     # Mock the analyzer
     mock_output = VisionOutput(
         scene_confidence=0.9,
@@ -42,12 +42,12 @@ def test_process_capture_updates_status(db):
                 brand="Jif",
                 package_type="jar",
                 quantity_estimate=2,
-                confidence=0.85
+                confidence=0.85,
             )
         ],
-        notes="Clear image"
+        notes="Clear image",
     )
-    
+
     processor = CaptureProcessor()
     # If OPENAI_API_KEY isn't set, analyzer will be None; just validate wiring.
     assert hasattr(processor, "process_capture")
@@ -56,12 +56,12 @@ def test_process_capture_updates_status(db):
 def test_process_pending_captures(db):
     """Test batch processing of pending captures"""
     processor = CaptureProcessor()
-    
+
     # Create test device
     device = Device(id="test-device", name="Test", token_hash="hash")
     db.add(device)
     db.flush()
-    
+
     # Create multiple captures
     for i in range(3):
         capture = Capture(
@@ -74,7 +74,7 @@ def test_process_pending_captures(db):
         )
         db.add(capture)
     db.commit()
-    
+
     # Count should return 0 because analyzer isn't properly mocked and files don't exist
     # But the method should work without error
     count = processor.process_pending_captures(limit=5)

@@ -1,4 +1,5 @@
 """Inventory verification queue + HEB product enrichment."""
+
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -28,7 +29,10 @@ async def list_unverified(
     )
     total = base.count()
     items = (
-        base.order_by(InventoryState.last_seen_at.asc().nullsfirst(), InventoryItem.canonical_name.asc())
+        base.order_by(
+            InventoryState.last_seen_at.asc().nullsfirst(),
+            InventoryItem.canonical_name.asc(),
+        )
         .limit(limit)
         .all()
     )
@@ -41,7 +45,11 @@ async def list_unverified(
                 "count_estimate": (it.states[0].count_estimate if it.states else 0),
                 "par_level": (it.states[0].par_level if it.states else None),
                 "confidence": (it.states[0].confidence if it.states else 0),
-                "last_seen_at": (it.states[0].last_seen_at.isoformat() if it.states and it.states[0].last_seen_at else None),
+                "last_seen_at": (
+                    it.states[0].last_seen_at.isoformat()
+                    if it.states and it.states[0].last_seen_at
+                    else None
+                ),
             }
             for it in items
         ],
@@ -50,7 +58,9 @@ async def list_unverified(
 
 
 @router.post("/inventory/{item_id}/verify")
-async def verify_item_count(item_id: str, payload: InventoryVerifyRequest, db: Session = Depends(get_db)):
+async def verify_item_count(
+    item_id: str, payload: InventoryVerifyRequest, db: Session = Depends(get_db)
+):
     """Record a user-confirmed count for an item (sets confidence=1.0, marks verified)."""
     item = db.query(InventoryItem).filter(InventoryItem.id == item_id).first()
     if not item:
@@ -67,7 +77,9 @@ async def verify_item_count(item_id: str, payload: InventoryVerifyRequest, db: S
     state.is_manual = True
     state.last_seen_at = datetime.utcnow()
     note = payload.notes or "USER VERIFIED"
-    state.notes = (state.notes or "") + f" [{note} {datetime.utcnow().date().isoformat()}]"
+    state.notes = (
+        state.notes or ""
+    ) + f" [{note} {datetime.utcnow().date().isoformat()}]"
 
     db.commit()
     return {
@@ -80,7 +92,9 @@ async def verify_item_count(item_id: str, payload: InventoryVerifyRequest, db: S
 
 
 @router.post("/inventory/{item_id}/heb-enrich")
-async def heb_enrich(item_id: str, payload: HebEnrichmentPayload, db: Session = Depends(get_db)):
+async def heb_enrich(
+    item_id: str, payload: HebEnrichmentPayload, db: Session = Depends(get_db)
+):
     """Store HEB product info fetched from heb.com for an inventory item."""
     item = db.query(InventoryItem).filter(InventoryItem.id == item_id).first()
     if not item:
@@ -99,7 +113,9 @@ async def heb_enrich(item_id: str, payload: HebEnrichmentPayload, db: Session = 
 
     # If we have an HEB image and no local image yet, adopt it
     if payload.image_url and not item.image_path:
-        item.image_path = payload.image_url  # stored as remote URL; UI resolves absolute
+        item.image_path = (
+            payload.image_url
+        )  # stored as remote URL; UI resolves absolute
 
     db.commit()
     return {

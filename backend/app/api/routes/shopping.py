@@ -4,7 +4,11 @@ from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.models.schemas import ShoppingListResponse, ShoppingListItem, VoiceShoppingAdd
-from app.services.shopping import recompute_shopping_list, get_unresolved_items, add_voice_item
+from app.services.shopping import (
+    recompute_shopping_list,
+    get_unresolved_items,
+    add_voice_item,
+)
 
 router = APIRouter()
 
@@ -48,6 +52,7 @@ async def recompute(db: Session = Depends(get_db)):
     # Fire the event-driven Discord notification (Celery task, no cron needed).
     try:
         from app.workers.notify import notify_shopping_list
+
         notify_shopping_list.delay()
     except Exception:
         pass  # queue hiccup should not fail the API call

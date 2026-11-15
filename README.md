@@ -25,6 +25,7 @@ A battery-powered, event-driven pantry inventory system using ESP32 camera, Open
 - **Barcode scanning** — lookup + add to inventory
 - **Household profiles** — members, dietary restrictions, nutrition targets
 - **Emergency plan** — standalone 90-day food and water preparedness guide with locally saved checklist progress; plan targets are separate from pantry stock and shopping data
+- **Prepping gear** — separate saved inventory for emergency equipment and supplies, searchable by item, category, location, and notes
 
 ## Quick Start
 
@@ -196,6 +197,18 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for detailed component descriptions, da
     -H "Content-Type: application/json" \
     -d '{"item_name":"peanut butter","count_estimate":3,"notes":"refilled"}'
   ```
+
+### Prepping Gear
+
+The separate `/gear` screen stores preparedness equipment and supplies without mixing them into the food inventory. Add, edit, search, and delete records with an item name, free-text category, quantity, optional unit/location/notes, and condition (Good, Needs attention, or Unknown).
+
+The API provides `GET` and `POST /v1/gear`, plus `PATCH` and `DELETE /v1/gear/{gear_id}`. For local use, start the backend and web app as described above, then open `/gear`.
+
+Desktop and mobile screenshots of the running gear register (the item shown is sample data from local QA):
+
+![Prepping Gear inventory at desktop size](screenshots/prepping-gear/desktop.png)
+
+![Prepping Gear inventory at mobile size](screenshots/prepping-gear/mobile.png)
 
 ### Health
 - **GET** `/health` - Health check

@@ -31,31 +31,32 @@ async def list_devices(
 ):
     """
     List all registered devices with pagination.
-    
+
     Query Parameters:
     - skip: Number of devices to skip (default: 0)
     - limit: Maximum devices to return (default: 100, max: 1000)
     """
     logger.info(f"Listing devices (skip={skip}, limit={limit})")
-    
+
     # Get total count
     total = db.query(Device).count()
-    
+
     # Get paginated results
     devices = db.query(Device).offset(skip).limit(limit).all()
-    
+
     device_responses = []
     for device in devices:
         # Count captures and failures
-        total_captures = db.query(Capture).filter(
-            Capture.device_id == device.id
-        ).count()
-        
-        failed_uploads = db.query(Capture).filter(
-            Capture.device_id == device.id,
-            Capture.status == "failed"
-        ).count()
-        
+        total_captures = (
+            db.query(Capture).filter(Capture.device_id == device.id).count()
+        )
+
+        failed_uploads = (
+            db.query(Capture)
+            .filter(Capture.device_id == device.id, Capture.status == "failed")
+            .count()
+        )
+
         device_responses.append(
             DeviceResponse(
                 id=device.id,
@@ -70,7 +71,7 @@ async def list_devices(
                 status=_get_device_status(device),
             )
         )
-    
+
     return DeviceListResponse(
         items=device_responses,
         total=total,
@@ -86,30 +87,29 @@ async def get_device(
 ):
     """
     Get detailed information about a specific device.
-    
+
     Path Parameters:
     - device_id: The unique device identifier
-    
+
     Returns:
     - Device information with current status, battery level, and capture statistics
     """
     logger.info(f"Getting device: {device_id}")
-    
+
     device = db.query(Device).filter_by(id=device_id).first()
     if not device:
         logger.warning(f"Device not found: {device_id}")
         raise HTTPException(status_code=404, detail=f"Device {device_id} not found")
-    
+
     # Count captures and failures
-    total_captures = db.query(Capture).filter(
-        Capture.device_id == device.id
-    ).count()
-    
-    failed_uploads = db.query(Capture).filter(
-        Capture.device_id == device.id,
-        Capture.status == "failed"
-    ).count()
-    
+    total_captures = db.query(Capture).filter(Capture.device_id == device.id).count()
+
+    failed_uploads = (
+        db.query(Capture)
+        .filter(Capture.device_id == device.id, Capture.status == "failed")
+        .count()
+    )
+
     return DeviceResponse(
         id=device.id,
         name=device.name,
@@ -131,7 +131,7 @@ async def get_device_health(
 ):
     """
     Get detailed health metrics for a device.
-    
+
     Returns:
     - Battery percentage and voltage
     - WiFi signal strength (RSSI)
@@ -140,26 +140,30 @@ async def get_device_health(
     - Recent capture statistics
     """
     logger.info(f"Getting health for device: {device_id}")
-    
+
     device = db.query(Device).filter_by(id=device_id).first()
     if not device:
         raise HTTPException(status_code=404, detail=f"Device {device_id} not found")
-    
+
     # Get last 7 days of captures
     week_ago = datetime.utcnow() - timedelta(days=7)
-    recent_captures = db.query(Capture).filter(
-        Capture.device_id == device.id,
-        Capture.created_at >= week_ago,
-    ).all()
-    
+    recent_captures = (
+        db.query(Capture)
+        .filter(
+            Capture.device_id == device.id,
+            Capture.created_at >= week_ago,
+        )
+        .all()
+    )
+
     # Calculate statistics
     total_recent = len(recent_captures)
     successful = len([c for c in recent_captures if c.status == "complete"])
     failed = len([c for c in recent_captures if c.status == "failed"])
     analyzing = len([c for c in recent_captures if c.status == "analyzing"])
-    
+
     success_rate = (successful / total_recent * 100) if total_recent > 0 else 0
-    
+
     # Get last 24 hours (defensive against both naive and aware datetimes)
     day_ago = datetime.utcnow() - timedelta(days=1)
     capture_24h_count = 0
@@ -172,7 +176,7 @@ async def get_device_health(
             if ct >= day_ago:
                 capture_24h_count += 1
     captures_24h = capture_24h_count
-    
+
     # Device health check (defensive timezone handling)
     ls = device.last_seen_at
     if ls is not None and ls.tzinfo is not None:
@@ -180,11 +184,11 @@ async def get_device_health(
     else:
         ls_naive = ls
     is_healthy = bool(
-        ls_naive and
-        (datetime.utcnow() - ls_naive) < timedelta(hours=1) and
-        success_rate > 90
+        ls_naive
+        and (datetime.utcnow() - ls_naive) < timedelta(hours=1)
+        and success_rate > 90
     )
-    
+
     return DeviceHealthResponse(
         device_id=device.id,
         is_healthy=is_healthy,
@@ -192,12 +196,10 @@ async def get_device_health(
         battery_pct=_calculate_battery_percentage(device.last_battery_v),
         rssi=device.last_rssi,
         last_seen_at=device.last_seen_at,
-        last_seen_ago_seconds=int(
-            (datetime.utcnow() - ls_naive).total_seconds()
-        ) if ls_naive else None,
-        total_captures=db.query(Capture).filter(
-            Capture.device_id == device.id
-        ).count(),
+        last_seen_ago_seconds=(
+            int((datetime.utcnow() - ls_naive).total_seconds()) if ls_naive else None
+        ),
+        total_captures=db.query(Capture).filter(Capture.device_id == device.id).count(),
         captures_7d=total_recent,
         captures_24h=captures_24h,
         successful_7d=successful,
@@ -214,21 +216,21 @@ async def create_device(
 ):
     """
     Register a new device.
-    
+
     Request Body:
     - name: Human-readable device name
     - device_id: Optional custom device ID (generated if not provided)
-    
+
     Returns:
     - DeviceResponse with generated device_id and authentication token
-    
+
     Note: The device token must be saved by the caller and provided in future requests.
     """
     logger.info(f"Creating new device: {request.name}")
-    
+
     # Use provided device_id or generate one
     device_id = request.device_id or f"device-{TokenManager.generate_token()[:16]}"
-    
+
     # Check if device already exists
     existing = db.query(Device).filter_by(id=device_id).first()
     if existing:
@@ -236,23 +238,23 @@ async def create_device(
             status_code=409,
             detail=f"Device {device_id} already exists",
         )
-    
+
     # Generate device token and hash it
     device_token = TokenManager.generate_token()
     token_hash = TokenManager.hash_token(device_token)
-    
+
     # Create device
     device = Device(
         id=device_id,
         name=request.name,
         token_hash=token_hash,
     )
-    
+
     db.add(device)
     db.commit()
-    
+
     logger.info(f"Created device: {device_id}")
-    
+
     return DeviceResponse(
         id=device.id,
         name=device.name,
@@ -276,40 +278,39 @@ async def update_device(
 ):
     """
     Update device settings.
-    
+
     Path Parameters:
     - device_id: The unique device identifier
-    
+
     Request Body (all optional):
     - name: Update device name
     - enabled: Enable/disable device
-    
+
     Returns:
     - Updated DeviceResponse
     """
     logger.info(f"Updating device: {device_id}")
-    
+
     device = db.query(Device).filter_by(id=device_id).first()
     if not device:
         raise HTTPException(status_code=404, detail=f"Device {device_id} not found")
-    
+
     # Update fields if provided
     if request.name is not None:
         device.name = request.name
         logger.info(f"Updated device name to: {request.name}")
-    
+
     db.commit()
-    
+
     # Count captures
-    total_captures = db.query(Capture).filter(
-        Capture.device_id == device.id
-    ).count()
-    
-    failed_uploads = db.query(Capture).filter(
-        Capture.device_id == device.id,
-        Capture.status == "failed"
-    ).count()
-    
+    total_captures = db.query(Capture).filter(Capture.device_id == device.id).count()
+
+    failed_uploads = (
+        db.query(Capture)
+        .filter(Capture.device_id == device.id, Capture.status == "failed")
+        .count()
+    )
+
     return DeviceResponse(
         id=device.id,
         name=device.name,
@@ -331,30 +332,30 @@ async def delete_device(
 ):
     """
     Deregister a device and optionally delete its data.
-    
+
     Path Parameters:
     - device_id: The unique device identifier
-    
+
     Returns:
     - Success message
-    
+
     Note: This removes the device from the registry. Associated captures and data
     can be configured to remain in the database for historical analysis.
     """
     logger.info(f"Deleting device: {device_id}")
-    
+
     device = db.query(Device).filter_by(id=device_id).first()
     if not device:
         raise HTTPException(status_code=404, detail=f"Device {device_id} not found")
-    
+
     device_name = device.name
-    
+
     # Delete device
     db.delete(device)
     db.commit()
-    
+
     logger.info(f"Deleted device: {device_id}")
-    
+
     return {
         "success": True,
         "message": f"Device '{device_name}' ({device_id}) has been deregistered",
@@ -370,36 +371,36 @@ async def get_device_captures(
 ):
     """
     Get capture history for a device.
-    
+
     Path Parameters:
     - device_id: The unique device identifier
-    
+
     Query Parameters:
     - days: Number of days of history (1-90, default: 7)
     - status: Filter by capture status (stored, analyzing, complete, failed)
-    
+
     Returns:
     - List of captures with timestamps and status
     """
     logger.info(f"Getting captures for device {device_id} (last {days} days)")
-    
+
     device = db.query(Device).filter_by(id=device_id).first()
     if not device:
         raise HTTPException(status_code=404, detail=f"Device {device_id} not found")
-    
+
     # Build query
     cutoff = datetime.utcnow() - timedelta(days=days)
     query = db.query(Capture).filter(
         Capture.device_id == device_id,
         Capture.created_at >= cutoff,
     )
-    
+
     # Filter by status if provided
     if status:
         query = query.filter(Capture.status == status)
-    
+
     captures = query.order_by(Capture.created_at.desc()).all()
-    
+
     return {
         "device_id": device_id,
         "days": days,
@@ -422,27 +423,28 @@ async def get_device_captures(
 
 # Helper functions
 
+
 def _calculate_battery_percentage(voltage: Optional[float]) -> Optional[float]:
     """Calculate battery percentage from voltage.
-    
+
     Auto-detects cell count: <= 4.3V => 1S (3.0-4.2V),
     otherwise 2S (6.0-8.4V).
     """
     if voltage is None:
         return None
-    
+
     if voltage <= 4.3:
         # 1S LiPo: 3.0V (0%) to 4.2V (100%)
         MIN_V, MAX_V = 3.0, 4.2
     else:
         # 2S LiPo: 6.0V (0%) to 8.4V (100%)
         MIN_V, MAX_V = 6.0, 8.4
-    
+
     if voltage < MIN_V:
         return 0.0
     if voltage > MAX_V:
         return 100.0
-    
+
     percentage = ((voltage - MIN_V) / (MAX_V - MIN_V)) * 100.0
     return round(percentage, 1)
 
@@ -457,7 +459,7 @@ def _get_device_status(device: Device) -> str:
     if last_seen.tzinfo is None:
         last_seen = last_seen.replace(tzinfo=timezone.utc)
     time_diff = now - last_seen
-    
+
     if time_diff < timedelta(hours=1):
         return "active"
     elif time_diff < timedelta(days=1):

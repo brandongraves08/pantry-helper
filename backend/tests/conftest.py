@@ -12,6 +12,7 @@ from app.db.models import Device
 from app.workers.celery_app import celery_app
 import hashlib
 
+
 # Create in-memory SQLite database for testing
 @pytest.fixture(scope="function")
 def db():
@@ -23,12 +24,13 @@ def db():
     )
     Base.metadata.create_all(bind=engine)
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    
+
     db = SessionLocal()
-    
+
     yield db
-    
+
     db.close()
+
 
 @pytest.fixture(scope="function")
 def client(db):

@@ -3,7 +3,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
-from app.db.models import Recipe as RecipeModel, RecipeIngredient as RecipeIngredientModel, InventoryItem
+from app.db.models import (
+    Recipe as RecipeModel,
+    RecipeIngredient as RecipeIngredientModel,
+    InventoryItem,
+)
 from app.models.schemas import (
     RecipeCreate,
     Recipe as RecipeSchema,
@@ -25,7 +29,9 @@ def _serialize(recipe: RecipeModel) -> RecipeSchema:
             name=ing.name,
             note=ing.note,
             inventory_item_id=ing.inventory_item_id,
-            inventory_item_name=(ing.inventory_item.canonical_name if ing.inventory_item else None),
+            inventory_item_name=(
+                ing.inventory_item.canonical_name if ing.inventory_item else None
+            ),
         )
         for ing in (recipe.ingredients or [])
     ]
@@ -105,14 +111,16 @@ async def suggest_recipes(
         tracked = stocked + missing
         match_pct = stocked / tracked if tracked > 0 else 1.0
 
-        suggestions.append(RecipeSuggestion(
-            recipe=_serialize(recipe),
-            total_ingredients=total,
-            in_stock=stocked,
-            missing=missing,
-            not_tracked=untracked,
-            match_pct=round(match_pct, 2),
-        ))
+        suggestions.append(
+            RecipeSuggestion(
+                recipe=_serialize(recipe),
+                total_ingredients=total,
+                in_stock=stocked,
+                missing=missing,
+                not_tracked=untracked,
+                match_pct=round(match_pct, 2),
+            )
+        )
 
     suggestions.sort(key=lambda s: (-s.match_pct, -s.in_stock, s.recipe.name))
     return RecipeSuggestResponse(
@@ -148,14 +156,16 @@ async def create_recipe(payload: RecipeCreate, db: Session = Depends(get_db)):
     db.flush()
 
     for i, ing in enumerate(payload.ingredients or []):
-        recipe.ingredients.append(RecipeIngredientModel(
-            recipe_id=recipe.id,
-            position=i,
-            quantity=ing.quantity,
-            name=ing.name,
-            note=ing.note,
-            inventory_item_id=ing.inventory_item_id,
-        ))
+        recipe.ingredients.append(
+            RecipeIngredientModel(
+                recipe_id=recipe.id,
+                position=i,
+                quantity=ing.quantity,
+                name=ing.name,
+                note=ing.note,
+                inventory_item_id=ing.inventory_item_id,
+            )
+        )
 
     db.commit()
     db.refresh(recipe)
@@ -163,7 +173,9 @@ async def create_recipe(payload: RecipeCreate, db: Session = Depends(get_db)):
 
 
 @router.put("/recipes/{recipe_id}", response_model=RecipeSchema)
-async def update_recipe(recipe_id: str, payload: RecipeCreate, db: Session = Depends(get_db)):
+async def update_recipe(
+    recipe_id: str, payload: RecipeCreate, db: Session = Depends(get_db)
+):
     """Update an existing recipe (replaces ingredients)."""
     recipe = db.query(RecipeModel).filter(RecipeModel.id == recipe_id).first()
     if not recipe:
@@ -185,14 +197,16 @@ async def update_recipe(recipe_id: str, payload: RecipeCreate, db: Session = Dep
     recipe.ingredients.clear()
     db.flush()
     for i, ing in enumerate(payload.ingredients or []):
-        recipe.ingredients.append(RecipeIngredientModel(
-            recipe_id=recipe.id,
-            position=i,
-            quantity=ing.quantity,
-            name=ing.name,
-            note=ing.note,
-            inventory_item_id=ing.inventory_item_id,
-        ))
+        recipe.ingredients.append(
+            RecipeIngredientModel(
+                recipe_id=recipe.id,
+                position=i,
+                quantity=ing.quantity,
+                name=ing.name,
+                note=ing.note,
+                inventory_item_id=ing.inventory_item_id,
+            )
+        )
 
     db.commit()
     db.refresh(recipe)
@@ -218,17 +232,19 @@ async def recipe_shopping_needs(recipe_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Recipe not found")
 
     needs = []
-    for ing in (recipe.ingredients or []):
+    for ing in recipe.ingredients or []:
         if not ing.inventory_item:
-            needs.append({
-                "ingredient": ing.name,
-                "quantity": ing.quantity,
-                "note": ing.note,
-                "in_inventory": False,
-                "count": 0,
-                "par_level": None,
-                "status": "not_tracked",
-            })
+            needs.append(
+                {
+                    "ingredient": ing.name,
+                    "quantity": ing.quantity,
+                    "note": ing.note,
+                    "in_inventory": False,
+                    "count": 0,
+                    "par_level": None,
+                    "status": "not_tracked",
+                }
+            )
             continue
         state = ing.inventory_item.states[0] if ing.inventory_item.states else None
         count = state.count_estimate if state else 0
@@ -239,16 +255,18 @@ async def recipe_shopping_needs(recipe_id: str, db: Session = Depends(get_db)):
             status = "no_par"
         else:
             status = "ok"
-        needs.append({
-            "ingredient": ing.name,
-            "quantity": ing.quantity,
-            "note": ing.note,
-            "in_inventory": True,
-            "item_name": ing.inventory_item.canonical_name,
-            "inventory_item_id": ing.inventory_item.id,
-            "count": count,
-            "par_level": par,
-            "status": status,
-        })
+        needs.append(
+            {
+                "ingredient": ing.name,
+                "quantity": ing.quantity,
+                "note": ing.note,
+                "in_inventory": True,
+                "item_name": ing.inventory_item.canonical_name,
+                "inventory_item_id": ing.inventory_item.id,
+                "count": count,
+                "par_level": par,
+                "status": status,
+            }
+        )
 
     return {"recipe_id": recipe.id, "recipe_name": recipe.name, "needs": needs}

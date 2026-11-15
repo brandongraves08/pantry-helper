@@ -377,12 +377,19 @@ pantry-inventory/
 
 ### Backend env vars
 
-* `OPENAI_API_KEY`
+Actual env vars read by `backend/app/config.py` (anything else here is inert):
+
+* `OPENAI_API_KEY`, `OPENAI_MODEL`
 * `DATABASE_URL`
-* `STORAGE_PATH` or `S3_BUCKET`
-* `DEVICE_TOKEN_SALT`
-* `VISION_MODEL` (if configurable)
-* `INVENTORY_CONFIDENCE_THRESHOLD` (default 0.70)
+* `STORAGE_PATH` (no `S3_BUCKET` / `DEVICE_TOKEN_SALT` support in code)
+* `VISION_PROVIDER`, `VISION_MODEL` is not read — the provider-specific models are
+  `HERMES_MODEL`, `OPENAI_MODEL`, `NVIDIA_MODEL`
+* `PANTRY_API_TOKEN` — shared bearer token for write routes; unset = writes open
+* `REDIS_URL`, `CELERY_BROKER_URL`, `CELERY_RESULT_BACKEND`
+* `IMAGE_RETENTION_DAYS`, `MAX_STORAGE_MB`, `LOG_LEVEL`, `CORS_ORIGINS`
+* `VISION_MIN_CONFIDENCE` (0.70) / `VISION_MIN_SCENE_CONFIDENCE` (0.30) are
+  declared but **not wired** — the live gate is the hardcoded `0.7` in
+  `backend/app/workers/capture.py`. There is no `INVENTORY_CONFIDENCE_THRESHOLD`.
 
 ### Firmware config
 

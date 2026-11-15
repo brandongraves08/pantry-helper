@@ -1,4 +1,5 @@
 """Meal planning: weekly plans, scheduled recipes, pantry verification, shopping merge."""
+
 import math
 import re
 from datetime import date, datetime, timedelta
@@ -45,7 +46,22 @@ _FRACTIONS = {
 }
 
 # Units that make the quantity non-countable (weight/volume → "1 unit per use" heuristic)
-_APPROX_UNITS = ("lb", "oz", "cup", "tbsp", "tsp", "ml", "l ", "kg", "g ", "quart", "pint", "gallon", "liter", "litre")
+_APPROX_UNITS = (
+    "lb",
+    "oz",
+    "cup",
+    "tbsp",
+    "tsp",
+    "ml",
+    "l ",
+    "kg",
+    "g ",
+    "quart",
+    "pint",
+    "gallon",
+    "liter",
+    "litre",
+)
 
 
 def parse_quantity(qty: str | None) -> tuple[float | None, bool]:
@@ -69,7 +85,7 @@ def parse_quantity(qty: str | None) -> tuple[float | None, bool]:
 
     # Find the remainder after the leading numeric token
     m = re.match(r"^[\s\d./¼½¾⅓⅔⅛⅜⅝⅞]+", s)
-    rest = s[m.end():].strip() if m else s
+    rest = s[m.end() :].strip() if m else s
 
     approx = any(rest.startswith(u) for u in _APPROX_UNITS)
     return value, approx
@@ -156,11 +172,14 @@ def _serialize_plan(plan: MealPlanModel) -> MealPlanResponse:
 
 # ── Plan CRUD ────────────────────────────────────────────────────────
 
+
 @router.get("/meal-plans", response_model=MealPlanListResponse)
 async def list_meal_plans(db: Session = Depends(get_db)):
     """List all meal plans (newest first)."""
     plans = db.query(MealPlanModel).order_by(MealPlanModel.week_start.desc()).all()
-    return MealPlanListResponse(plans=[_serialize_plan(p) for p in plans], total=len(plans))
+    return MealPlanListResponse(
+        plans=[_serialize_plan(p) for p in plans], total=len(plans)
+    )
 
 
 @router.get("/meal-plans/{plan_id}", response_model=MealPlanResponse)
@@ -181,7 +200,9 @@ async def create_meal_plan(payload: MealPlanCreate, db: Session = Depends(get_db
 
 
 @router.put("/meal-plans/{plan_id}", response_model=MealPlanResponse)
-async def update_meal_plan(plan_id: str, payload: MealPlanCreate, db: Session = Depends(get_db)):
+async def update_meal_plan(
+    plan_id: str, payload: MealPlanCreate, db: Session = Depends(get_db)
+):
     plan = db.query(MealPlanModel).filter(MealPlanModel.id == plan_id).first()
     if not plan:
         raise HTTPException(status_code=404, detail="Meal plan not found")
@@ -204,8 +225,15 @@ async def delete_meal_plan(plan_id: str, db: Session = Depends(get_db)):
 
 # ── Entries ──────────────────────────────────────────────────────────
 
-@router.post("/meal-plans/{plan_id}/entries", response_model=MealPlanEntryResponse, status_code=201)
-async def add_meal_plan_entry(plan_id: str, payload: MealPlanEntryInput, db: Session = Depends(get_db)):
+
+@router.post(
+    "/meal-plans/{plan_id}/entries",
+    response_model=MealPlanEntryResponse,
+    status_code=201,
+)
+async def add_meal_plan_entry(
+    plan_id: str, payload: MealPlanEntryInput, db: Session = Depends(get_db)
+):
     plan = db.query(MealPlanModel).filter(MealPlanModel.id == plan_id).first()
     if not plan:
         raise HTTPException(status_code=404, detail="Meal plan not found")
@@ -237,7 +265,9 @@ async def add_meal_plan_entry(plan_id: str, payload: MealPlanEntryInput, db: Ses
 
 @router.delete("/meal-plans/entries/{entry_id}", status_code=204)
 async def delete_meal_plan_entry(entry_id: str, db: Session = Depends(get_db)):
-    entry = db.query(MealPlanEntryModel).filter(MealPlanEntryModel.id == entry_id).first()
+    entry = (
+        db.query(MealPlanEntryModel).filter(MealPlanEntryModel.id == entry_id).first()
+    )
     if not entry:
         raise HTTPException(status_code=404, detail="Meal plan entry not found")
     db.delete(entry)
@@ -247,7 +277,10 @@ async def delete_meal_plan_entry(entry_id: str, db: Session = Depends(get_db)):
 
 # ── Verification & shopping ──────────────────────────────────────────
 
-def _aggregate_needs(plan: MealPlanModel, db: Session, min_confidence: float) -> tuple[list[dict], dict]:
+
+def _aggregate_needs(
+    plan: MealPlanModel, db: Session, min_confidence: float
+) -> tuple[list[dict], dict]:
     """Aggregate ingredient needs across all entries of a plan.
 
     Returns (items, summary) where each item is a plain dict:
@@ -274,25 +307,32 @@ def _aggregate_needs(plan: MealPlanModel, db: Session, min_confidence: float) ->
         if not recipe:
             continue
         mult = entry.servings_multiplier or 1
-        for ing in (recipe.ingredients or []):
+        for ing in recipe.ingredients or []:
             value, approx = parse_quantity(ing.quantity)
             if ing.inventory_item_id:
                 key = ing.inventory_item_id
-                inv_name = ing.inventory_item.canonical_name if ing.inventory_item else ing.name
+                inv_name = (
+                    ing.inventory_item.canonical_name
+                    if ing.inventory_item
+                    else ing.name
+                )
             else:
                 key = f"untracked:{ing.name.strip().lower()}"
                 inv_name = None
 
-            bucket = buckets.setdefault(key, {
-                "name": ing.name,
-                "quantity": ing.quantity,
-                "inventory_item_id": ing.inventory_item_id,
-                "inventory_item_name": inv_name,
-                "required_units": 0.0,
-                "approx": approx,
-                "sources": [],
-                "allergen_warnings": None,
-            })
+            bucket = buckets.setdefault(
+                key,
+                {
+                    "name": ing.name,
+                    "quantity": ing.quantity,
+                    "inventory_item_id": ing.inventory_item_id,
+                    "inventory_item_name": inv_name,
+                    "required_units": 0.0,
+                    "approx": approx,
+                    "sources": [],
+                    "allergen_warnings": None,
+                },
+            )
             if value is None:
                 # Unparseable (to taste, etc.) — count as 1 unit per use, approx
                 bucket["required_units"] += 1.0 * mult
@@ -300,27 +340,35 @@ def _aggregate_needs(plan: MealPlanModel, db: Session, min_confidence: float) ->
             else:
                 bucket["required_units"] += value * mult
             bucket["approx"] = bucket["approx"] or approx
-            bucket["sources"].append({
-                "date": entry.plan_date.isoformat(),
-                "meal_type": entry.meal_type,
-                "recipe": recipe.name,
-                "quantity": ing.quantity,
-                "servings_multiplier": mult,
-            })
-            
+            bucket["sources"].append(
+                {
+                    "date": entry.plan_date.isoformat(),
+                    "meal_type": entry.meal_type,
+                    "recipe": recipe.name,
+                    "quantity": ing.quantity,
+                    "servings_multiplier": mult,
+                }
+            )
+
             # Check for allergens in this ingredient
             if ing.inventory_item_id:
                 # Query allergens for this inventory item
-                allergens = db.query(ItemAllergenModel).filter(
-                    ItemAllergenModel.inventory_item_id == ing.inventory_item_id,
-                    ItemAllergenModel.is_present == True
-                ).all()
+                allergens = (
+                    db.query(ItemAllergenModel)
+                    .filter(
+                        ItemAllergenModel.inventory_item_id == ing.inventory_item_id,
+                        ItemAllergenModel.is_present == True,
+                    )
+                    .all()
+                )
                 member_warnings = []
                 for member_id, allergens_set in member_allergens.items():
                     for allergen in allergens:
                         if allergen.allergen.lower().strip() in allergens_set:
                             name = member_names.get(member_id, member_id)
-                            member_warnings.append(f"Contains {allergen.allergen} — {name} is allergic")
+                            member_warnings.append(
+                                f"Contains {allergen.allergen} — {name} is allergic"
+                            )
                 if member_warnings:
                     bucket["allergen_warnings"] = member_warnings
 
@@ -366,7 +414,9 @@ def _window_dates(start: str | None, end: str | None) -> tuple[date, date]:
     try:
         s = date.fromisoformat(start) if start else today
     except ValueError:
-        raise HTTPException(status_code=422, detail="start must be ISO date (YYYY-MM-DD)")
+        raise HTTPException(
+            status_code=422, detail="start must be ISO date (YYYY-MM-DD)"
+        )
     try:
         e = date.fromisoformat(end) if end else s + timedelta(days=6)  # rolling 7 days
     except ValueError:
@@ -414,7 +464,10 @@ async def verify_meal_plan(
     )
 
 
-@router.post("/meal-plans/{plan_id}/update-shopping", response_model=MealPlanUpdateShoppingResponse)
+@router.post(
+    "/meal-plans/{plan_id}/update-shopping",
+    response_model=MealPlanUpdateShoppingResponse,
+)
 async def update_shopping_from_plan(
     plan_id: str,
     start: str | None = None,
@@ -460,12 +513,14 @@ async def update_shopping_from_plan(
                 row.needed = max(row.needed, needed)
                 row.reason = "meal plan"
             else:
-                db.add(ShoppingListItemModel(
-                    item_id=item["inventory_item_id"],
-                    item_name=item["inventory_item_name"],
-                    needed=needed,
-                    reason="meal plan",
-                ))
+                db.add(
+                    ShoppingListItemModel(
+                        item_id=item["inventory_item_id"],
+                        item_name=item["inventory_item_name"],
+                        needed=needed,
+                        reason="meal plan",
+                    )
+                )
             added += 1
         else:
             # Untracked — free-text row (item_id NULL)
@@ -482,12 +537,14 @@ async def update_shopping_from_plan(
                 row.needed = max(row.needed, needed)
                 row.reason = "meal plan (untracked)"
             else:
-                db.add(ShoppingListItemModel(
-                    item_id=None,
-                    item_name=item["name"].strip(),
-                    needed=needed,
-                    reason="meal plan (untracked)",
-                ))
+                db.add(
+                    ShoppingListItemModel(
+                        item_id=None,
+                        item_name=item["name"].strip(),
+                        needed=needed,
+                        reason="meal plan (untracked)",
+                    )
+                )
             added += 1
 
     db.commit()

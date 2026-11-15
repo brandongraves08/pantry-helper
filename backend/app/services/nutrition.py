@@ -3,6 +3,7 @@
 Searches by product name (instead of barcode) so users can look up
 nutrition data for items in their inventory.
 """
+
 import logging
 from dataclasses import dataclass, field
 from typing import Optional
@@ -18,6 +19,7 @@ TIMEOUT_SECONDS = 10
 @dataclass
 class NutritionInfo:
     """Normalized nutrition data from a product search."""
+
     product_name: Optional[str] = None
     brand: Optional[str] = None
     category: Optional[str] = None
@@ -64,10 +66,14 @@ def search_by_name(query: str, limit: int = 5) -> list[NutritionInfo]:
         logger.warning("Open Food Facts search timeout", extra={"query": query})
         return []
     except requests.ConnectionError as e:
-        logger.warning("Open Food Facts connection error", extra={"query": query, "error": str(e)})
+        logger.warning(
+            "Open Food Facts connection error", extra={"query": query, "error": str(e)}
+        )
         return []
     except requests.RequestException as e:
-        logger.warning("Open Food Facts search error", extra={"query": query, "error": str(e)})
+        logger.warning(
+            "Open Food Facts search error", extra={"query": query, "error": str(e)}
+        )
         return []
 
     products = data.get("products", [])
@@ -96,8 +102,7 @@ def search_by_name(query: str, limit: int = 5) -> list[NutritionInfo]:
                 "sugars_g": nutriments.get("sugars_100g"),
             },
             allergens=[
-                tag.replace("en:", "").replace("-", "_")
-                for tag in allergens_tags
+                tag.replace("en:", "").replace("-", "_") for tag in allergens_tags
             ],
             ingredients_text=product.get("ingredients_text"),
             found=True,

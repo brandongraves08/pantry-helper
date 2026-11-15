@@ -14,9 +14,7 @@ class Settings(BaseSettings):
     DEBUG: bool = os.getenv("DEBUG", "false").lower() == "true"
 
     # Database Configuration
-    DATABASE_URL: str = os.getenv(
-        "DATABASE_URL", "sqlite:///./pantry.db"
-    )
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./pantry.db")
 
     # Vision Provider Configuration
     # Default is "hermes" (agent-driven analysis). Other supported providers:
@@ -34,7 +32,7 @@ class Settings(BaseSettings):
     OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-5")
     OPENAI_MAX_TOKENS: int = 1000
     OPENAI_TIMEOUT: int = 30
-    
+
     # NVIDIA NIM Configuration
     NVIDIA_NIM_API_KEY: Optional[str] = os.getenv("NVIDIA_NIM_API_KEY")
     NVIDIA_MODEL: str = os.getenv("NVIDIA_MODEL", "moonshotai/kimi-k2.5")
@@ -63,9 +61,7 @@ class Settings(BaseSettings):
     ]
 
     # Job Queue Configuration
-    CELERY_BROKER_URL: str = os.getenv(
-        "CELERY_BROKER_URL", "redis://localhost:6379/0"
-    )
+    CELERY_BROKER_URL: str = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")
     CELERY_RESULT_BACKEND: str = os.getenv(
         "CELERY_RESULT_BACKEND", "redis://localhost:6379/0"
     )
@@ -75,7 +71,7 @@ class Settings(BaseSettings):
     # Image Processing Configuration
     MAX_IMAGE_SIZE: int = 20 * 1024 * 1024  # 20 MB
     ALLOWED_IMAGE_TYPES: list = ["image/jpeg", "image/png", "image/webp"]
-    
+
     # Storage Configuration
     STORAGE_PATH: str = os.getenv("STORAGE_PATH", "./storage")
     IMAGE_RETENTION_DAYS: int = int(os.getenv("IMAGE_RETENTION_DAYS", "30"))
@@ -88,10 +84,12 @@ class Settings(BaseSettings):
     HOST: Optional[str] = None
     PORT: Optional[str] = None
 
-
     # Vision Confidence Tuning
     VISION_MIN_CONFIDENCE: float = float(os.getenv("VISION_MIN_CONFIDENCE", "0.7"))
-    VISION_MIN_SCENE_CONFIDENCE: float = float(os.getenv("VISION_MIN_SCENE_CONFIDENCE", "0.3"))
+    VISION_MIN_SCENE_CONFIDENCE: float = float(
+        os.getenv("VISION_MIN_SCENE_CONFIDENCE", "0.3")
+    )
+
     class Config:
         env_file = ".env"
         case_sensitive = True
@@ -99,4 +97,3 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
-

@@ -10,8 +10,12 @@ from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.db.models import (
-    InventoryItem, InventoryState, InventoryEvent, Capture,
-    ConsumptionEvent, HouseholdMember,
+    InventoryItem,
+    InventoryState,
+    InventoryEvent,
+    Capture,
+    ConsumptionEvent,
+    HouseholdMember,
 )
 from app.models.schemas import (
     InventoryItem as InventoryItemSchema,
@@ -33,15 +37,24 @@ async def get_inventory_statistics(db: Session = Depends(get_db)):
     total_captures = db.query(func.count(Capture.id)).scalar() or 0
 
     # Confidence breakdown
-    high_conf = db.query(func.count(InventoryState.id)).filter(
-        InventoryState.confidence >= 0.8
-    ).scalar() or 0
-    med_conf = db.query(func.count(InventoryState.id)).filter(
-        InventoryState.confidence >= 0.5, InventoryState.confidence < 0.8
-    ).scalar() or 0
-    low_conf = db.query(func.count(InventoryState.id)).filter(
-        InventoryState.confidence < 0.5
-    ).scalar() or 0
+    high_conf = (
+        db.query(func.count(InventoryState.id))
+        .filter(InventoryState.confidence >= 0.8)
+        .scalar()
+        or 0
+    )
+    med_conf = (
+        db.query(func.count(InventoryState.id))
+        .filter(InventoryState.confidence >= 0.5, InventoryState.confidence < 0.8)
+        .scalar()
+        or 0
+    )
+    low_conf = (
+        db.query(func.count(InventoryState.id))
+        .filter(InventoryState.confidence < 0.5)
+        .scalar()
+        or 0
+    )
 
     return {
         "total_items": total_items,
@@ -145,7 +158,9 @@ async def get_stale_items(
             "item_id": s.item_id,
             "canonical_name": s.item.canonical_name if s.item else "Unknown",
             "last_seen_at": str(s.last_seen_at),
-            "days_since": (datetime.utcnow() - s.last_seen_at).days if s.last_seen_at else None,
+            "days_since": (
+                (datetime.utcnow() - s.last_seen_at).days if s.last_seen_at else None
+            ),
             "count_estimate": s.count_estimate,
         }
         for s in states
@@ -206,6 +221,7 @@ def _item_to_dict(item: InventoryItem) -> dict:
 
 # ── Supply Forecast ───────────────────────────────────────────────────
 
+
 @router.post("/consumption")
 async def record_consumption(
     data: dict,
@@ -221,7 +237,9 @@ async def record_consumption(
     qty = data.get("quantity_used")
 
     if not member_id or not item_id or qty is None:
-        raise HTTPException(status_code=422, detail="member_id, inventory_item_id, quantity_required")
+        raise HTTPException(
+            status_code=422, detail="member_id, inventory_item_id, quantity_required"
+        )
 
     member = db.query(HouseholdMember).filter(HouseholdMember.id == member_id).first()
     if not member:
@@ -328,27 +346,33 @@ async def supply_forecast(
             if deficit > 0:
                 reorder_by = today + timedelta(days=max(0, int(days_left) - 3))
 
-        forecasts.append({
-            "item_id": item.id,
-            "canonical_name": item.canonical_name,
-            "current_stock": current_stock,
-            "par_level": par_level,
-            "daily_rate": round(daily_rate, 4),
-            "total_used_window": total_used,
-            "consumption_events": event_count,
-            "days_left": round(days_left, 1) if days_left is not None else None,
-            "status": status,
-            "reorder_by": str(reorder_by) if reorder_by else None,
-        })
+        forecasts.append(
+            {
+                "item_id": item.id,
+                "canonical_name": item.canonical_name,
+                "current_stock": current_stock,
+                "par_level": par_level,
+                "daily_rate": round(daily_rate, 4),
+                "total_used_window": total_used,
+                "consumption_events": event_count,
+                "days_left": round(days_left, 1) if days_left is not None else None,
+                "status": status,
+                "reorder_by": str(reorder_by) if reorder_by else None,
+            }
+        )
 
     # Sort: critical first, then low, depleting, stable, no_data
     status_order = {"critical": 0, "low": 1, "depleting": 2, "stable": 3, "no_data": 4}
-    forecasts.sort(key=lambda f: (status_order.get(f["status"], 9), f["days_left"] or 999))
+    forecasts.sort(
+        key=lambda f: (status_order.get(f["status"], 9), f["days_left"] or 999)
+    )
 
     return {
         "window_days": window_days,
         "total_items": len(forecasts),
-        "with_consumption_data": len([f for f in forecasts if f["consumption_events"] > 0]),
+        "with_consumption_data": len(
+            [f for f in forecasts if f["consumption_events"] > 0]
+        ),
         "critical": len([f for f in forecasts if f["status"] == "critical"]),
         "low": len([f for f in forecasts if f["status"] == "low"]),
         "forecasts": forecasts,

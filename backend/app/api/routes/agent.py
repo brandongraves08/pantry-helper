@@ -62,11 +62,7 @@ def _state_item(state: InventoryState) -> dict:
 
 
 def _low_stock_rows(db: Session, threshold: int) -> list[InventoryState]:
-    states = (
-        db.query(InventoryState)
-        .filter(InventoryState.confidence > 0)
-        .all()
-    )
+    states = db.query(InventoryState).filter(InventoryState.confidence > 0).all()
     rows = []
     for state in states:
         if state.par_level is not None:
@@ -127,7 +123,9 @@ async def get_agent_expiring(
     for row in rows:
         item = _state_item(row)
         expires_at = _as_aware(row.expires_at)
-        item["days_until_expiry"] = (expires_at.date() - now.date()).days if expires_at else None
+        item["days_until_expiry"] = (
+            (expires_at.date() - now.date()).days if expires_at else None
+        )
         items.append(item)
 
     return {
@@ -186,9 +184,7 @@ async def get_agent_summary(
     captures_failed = db.query(Capture).filter(Capture.status == "failed").count()
     captures_analyzing = db.query(Capture).filter(Capture.status == "analyzing").count()
     reviews_pending = (
-        db.query(InventoryReview)
-        .filter(InventoryReview.status == "pending")
-        .count()
+        db.query(InventoryReview).filter(InventoryReview.status == "pending").count()
     )
 
     devices = db.query(Device).all()
@@ -214,7 +210,9 @@ async def get_agent_summary(
 
     low_stock = _low_stock_rows(db, low_stock_threshold)
     expiring = _expiring_rows(db, expiry_days)
-    unhealthy_devices = [d for d in device_rows if d["status"] not in ("active", "idle")]
+    unhealthy_devices = [
+        d for d in device_rows if d["status"] not in ("active", "idle")
+    ]
 
     status = "green"
     if captures_failed or reviews_pending or unhealthy_devices or low_stock or expiring:

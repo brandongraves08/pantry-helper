@@ -3,12 +3,25 @@
 Tests the /v1/recipes/suggest and /v1/meal-plans/{id}/verify allergen
 warning functionality using the in-memory SQLite test database.
 """
+
 import pytest
 from datetime import date
 from app.db.models import (
-    InventoryItem, InventoryState, Recipe, RecipeIngredient,
-    HouseholdMember, DietaryRestriction, ItemAllergen, MealPlan, MealPlanEntry,
+    InventoryItem,
+    InventoryState,
+    Recipe,
+    RecipeIngredient,
+    HouseholdMember,
+    DietaryRestriction,
+    ItemAllergen,
+    MealPlan,
+    MealPlanEntry,
 )
+
+# GET /v1/meal-plans/{id}/verify defaults to a rolling window (today → today+6),
+# so meal-plan fixtures must land inside it. A hardcoded date silently falls out
+# of the window as the clock advances and the assertions then see an empty list.
+TODAY = date.today()
 
 
 def _create_inventory(db, name, count=2, par=4):
@@ -17,7 +30,10 @@ def _create_inventory(db, name, count=2, par=4):
     db.add(item)
     db.flush()
     state = InventoryState(
-        item_id=item.id, count_estimate=count, confidence=1.0, par_level=par,
+        item_id=item.id,
+        count_estimate=count,
+        confidence=1.0,
+        par_level=par,
     )
     db.add(state)
     db.flush()
@@ -30,15 +46,21 @@ def _create_recipe(db, name, ingredients):
     db.add(recipe)
     db.flush()
     for i, (ing_name, qty, inv_item) in enumerate(ingredients):
-        db.add(RecipeIngredient(
-            recipe_id=recipe.id, position=i, quantity=qty,
-            name=ing_name, inventory_item_id=inv_item.id if inv_item else None,
-        ))
+        db.add(
+            RecipeIngredient(
+                recipe_id=recipe.id,
+                position=i,
+                quantity=qty,
+                name=ing_name,
+                inventory_item_id=inv_item.id if inv_item else None,
+            )
+        )
     db.flush()
     return recipe
 
 
 # ── Recipe Suggestions ────────────────────────────────────────────────
+
 
 class TestRecipeSuggestions:
     def test_suggest_returns_all_recipes(self, client, db):
@@ -48,15 +70,23 @@ class TestRecipeSuggestions:
         cheese = _create_inventory(db, "Cheddar", count=4)
         tomatoes = _create_inventory(db, "Canned Tomatoes", count=0)
 
-        _create_recipe(db, "Burgers", [
-            ("ground beef", "1 lb", beef),
-            ("buns", "4", buns),
-            ("cheese", "4 slices", cheese),
-        ])
-        _create_recipe(db, "Pasta", [
-            ("tomatoes", "1 can", tomatoes),
-            ("spaghetti", "1 box", None),  # untracked
-        ])
+        _create_recipe(
+            db,
+            "Burgers",
+            [
+                ("ground beef", "1 lb", beef),
+                ("buns", "4", buns),
+                ("cheese", "4 slices", cheese),
+            ],
+        )
+        _create_recipe(
+            db,
+            "Pasta",
+            [
+                ("tomatoes", "1 can", tomatoes),
+                ("spaghetti", "1 box", None),  # untracked
+            ],
+        )
         db.commit()
 
         resp = client.get("/v1/recipes/suggest")
@@ -80,10 +110,14 @@ class TestRecipeSuggestions:
     def test_suggest_untracked_not_counted_as_missing(self, client, db):
         """Untracked ingredients (no inventory_item_id) don't hurt the score."""
         beef = _create_inventory(db, "Ground Beef", count=3)
-        _create_recipe(db, "Burgers", [
-            ("ground beef", "1 lb", beef),
-            ("salt", None, None),  # untracked — shouldn't count
-        ])
+        _create_recipe(
+            db,
+            "Burgers",
+            [
+                ("ground beef", "1 lb", beef),
+                ("salt", None, None),  # untracked — shouldn't count
+            ],
+        )
         db.commit()
 
         resp = client.get("/v1/recipes/suggest")
@@ -99,7 +133,9 @@ class TestRecipeSuggestions:
         cheese = _create_inventory(db, "Cheese", count=4)
 
         _create_recipe(db, "Partial", [("beef", "1 lb", beef), ("buns", "4", buns)])
-        _create_recipe(db, "Full", [("beef", "1 lb", beef), ("cheese", "2 slices", cheese)])
+        _create_recipe(
+            db, "Full", [("beef", "1 lb", beef), ("cheese", "2 slices", cheese)]
+        )
         db.commit()
 
         resp = client.get("/v1/recipes/suggest")
@@ -109,6 +145,7 @@ class TestRecipeSuggestions:
 
 
 # ── Allergen Warnings ─────────────────────────────────────────────────
+
 
 class TestAllergenWarnings:
     def test_warning_when_member_allergic(self, client, db):
@@ -120,24 +157,36 @@ class TestAllergenWarnings:
         member = HouseholdMember(name="Wife", member_relationship="spouse")
         db.add(member)
         db.flush()
-        db.add(DietaryRestriction(
-            member_id=member.id, restriction_type="allergen",
-            allergen="peanuts", severity="severe",
-        ))
+        db.add(
+            DietaryRestriction(
+                member_id=member.id,
+                restriction_type="allergen",
+                allergen="peanuts",
+                severity="severe",
+            )
+        )
 
         # Add peanut allergen to Ground Beef
-        db.add(ItemAllergen(
-            inventory_item_id=beef.id, allergen="peanuts", is_present=True,
-        ))
+        db.add(
+            ItemAllergen(
+                inventory_item_id=beef.id,
+                allergen="peanuts",
+                is_present=True,
+            )
+        )
 
         # Create meal plan
-        plan = MealPlan(week_start=date(2026, 8, 17), name="Test Week")
+        plan = MealPlan(week_start=TODAY, name="Test Week")
         db.add(plan)
         db.flush()
-        db.add(MealPlanEntry(
-            meal_plan_id=plan.id, plan_date=date(2026, 8, 17),
-            meal_type="dinner", recipe_id=recipe.id,
-        ))
+        db.add(
+            MealPlanEntry(
+                meal_plan_id=plan.id,
+                plan_date=TODAY,
+                meal_type="dinner",
+                recipe_id=recipe.id,
+            )
+        )
         db.commit()
 
         resp = client.get(f"/v1/meal-plans/{plan.id}/verify")
@@ -157,21 +206,33 @@ class TestAllergenWarnings:
         member = HouseholdMember(name="Wife", member_relationship="spouse")
         db.add(member)
         db.flush()
-        db.add(DietaryRestriction(
-            member_id=member.id, restriction_type="allergen",
-            allergen="gluten", severity="moderate",
-        ))
-        db.add(ItemAllergen(
-            inventory_item_id=beef.id, allergen="peanuts", is_present=True,
-        ))
+        db.add(
+            DietaryRestriction(
+                member_id=member.id,
+                restriction_type="allergen",
+                allergen="gluten",
+                severity="moderate",
+            )
+        )
+        db.add(
+            ItemAllergen(
+                inventory_item_id=beef.id,
+                allergen="peanuts",
+                is_present=True,
+            )
+        )
 
-        plan = MealPlan(week_start=date(2026, 8, 17), name="Test")
+        plan = MealPlan(week_start=TODAY, name="Test")
         db.add(plan)
         db.flush()
-        db.add(MealPlanEntry(
-            meal_plan_id=plan.id, plan_date=date(2026, 8, 17),
-            meal_type="dinner", recipe_id=recipe.id,
-        ))
+        db.add(
+            MealPlanEntry(
+                meal_plan_id=plan.id,
+                plan_date=TODAY,
+                meal_type="dinner",
+                recipe_id=recipe.id,
+            )
+        )
         db.commit()
 
         resp = client.get(f"/v1/meal-plans/{plan.id}/verify")
@@ -183,17 +244,25 @@ class TestAllergenWarnings:
         """No warnings when no household members exist."""
         beef = _create_inventory(db, "Ground Beef", count=3)
         recipe = _create_recipe(db, "Burgers", [("beef", "1 lb", beef)])
-        db.add(ItemAllergen(
-            inventory_item_id=beef.id, allergen="peanuts", is_present=True,
-        ))
+        db.add(
+            ItemAllergen(
+                inventory_item_id=beef.id,
+                allergen="peanuts",
+                is_present=True,
+            )
+        )
 
-        plan = MealPlan(week_start=date(2026, 8, 17), name="Test")
+        plan = MealPlan(week_start=TODAY, name="Test")
         db.add(plan)
         db.flush()
-        db.add(MealPlanEntry(
-            meal_plan_id=plan.id, plan_date=date(2026, 8, 17),
-            meal_type="dinner", recipe_id=recipe.id,
-        ))
+        db.add(
+            MealPlanEntry(
+                meal_plan_id=plan.id,
+                plan_date=TODAY,
+                meal_type="dinner",
+                recipe_id=recipe.id,
+            )
+        )
         db.commit()
 
         resp = client.get(f"/v1/meal-plans/{plan.id}/verify")
@@ -204,11 +273,16 @@ class TestAllergenWarnings:
 
 # ── Household Member API ──────────────────────────────────────────────
 
+
 class TestHouseholdMembers:
     def test_create_member(self, client, db):
-        resp = client.post("/v1/household/members", json={
-            "name": "Wife", "relationship": "spouse",
-        })
+        resp = client.post(
+            "/v1/household/members",
+            json={
+                "name": "Wife",
+                "relationship": "spouse",
+            },
+        )
         assert resp.status_code == 201
         data = resp.json()
         assert data["name"] == "Wife"
@@ -225,9 +299,14 @@ class TestHouseholdMembers:
     def test_add_restriction(self, client, db):
         resp = client.post("/v1/household/members", json={"name": "Wife"})
         member_id = resp.json()["id"]
-        resp = client.post(f"/v1/household/members/{member_id}/restrictions", json={
-            "restriction_type": "allergen", "allergen": "peanuts", "severity": "severe",
-        })
+        resp = client.post(
+            f"/v1/household/members/{member_id}/restrictions",
+            json={
+                "restriction_type": "allergen",
+                "allergen": "peanuts",
+                "severity": "severe",
+            },
+        )
         assert resp.status_code == 200
         assert resp.json()["allergen"] == "peanuts"
 

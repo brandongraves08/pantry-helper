@@ -1,4 +1,5 @@
 """Centralized logging configuration with structured JSON output for Loki."""
+
 import json
 import logging
 import os
@@ -14,16 +15,38 @@ class JSONFormatter(logging.Formatter):
     """
 
     # Standard LogRecord attrs that should not be treated as extra context
-    STANDARD_ATTRS = frozenset({
-        "args", "asctime", "created", "exc_info", "exc_text", "filename",
-        "funcName", "levelname", "levelno", "lineno", "message", "module",
-        "msecs", "msg", "name", "pathname", "process", "processName",
-        "relativeCreated", "stack_info", "thread", "threadName",
-    })
+    STANDARD_ATTRS = frozenset(
+        {
+            "args",
+            "asctime",
+            "created",
+            "exc_info",
+            "exc_text",
+            "filename",
+            "funcName",
+            "levelname",
+            "levelno",
+            "lineno",
+            "message",
+            "module",
+            "msecs",
+            "msg",
+            "name",
+            "pathname",
+            "process",
+            "processName",
+            "relativeCreated",
+            "stack_info",
+            "thread",
+            "threadName",
+        }
+    )
 
     def format(self, record: logging.LogRecord) -> str:
         entry = {
-            "timestamp": datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat(),
+            "timestamp": datetime.fromtimestamp(
+                record.created, tz=timezone.utc
+            ).isoformat(),
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),
@@ -83,7 +106,16 @@ def setup_logging(service_name: str = "pantry-helper"):
     logger.setLevel(level)
 
     # Quiet noisy libs
-    for noisy in ("httpx", "urllib3", "PIL", "google", "openai", "httpcore", "asyncio", "chardet"):
+    for noisy in (
+        "httpx",
+        "urllib3",
+        "PIL",
+        "google",
+        "openai",
+        "httpcore",
+        "asyncio",
+        "chardet",
+    ):
         logging.getLogger(noisy).setLevel(logging.WARNING)
 
     return ExtraLogger(logger, {})

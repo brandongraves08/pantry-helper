@@ -1,4 +1,5 @@
 """Shopping list service — shared recompute + query logic (DRY for route & worker)."""
+
 from sqlalchemy.orm import Session
 
 from app.db.models import InventoryState, ShoppingListItem as ShoppingListItemModel
@@ -59,9 +60,7 @@ def add_voice_item(db: Session, item_name: str, quantity: int = 1) -> dict:
     from app.db.models import InventoryItem
 
     item = (
-        db.query(InventoryItem)
-        .filter(InventoryItem.canonical_name.ilike(name))
-        .first()
+        db.query(InventoryItem).filter(InventoryItem.canonical_name.ilike(name)).first()
     )
 
     existing = (
