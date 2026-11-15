@@ -13,13 +13,21 @@ Regression tests for two defects found in the 2026-11-02 code-health audit:
 
 import pytest
 from datetime import datetime
+from uuid import uuid4
 
-from app.db.models import Capture, Device, InventoryItem, InventoryState, Observation
+from app.db.models import (
+    Capture,
+    Device,
+    InventoryEvent,
+    InventoryItem,
+    InventoryState,
+    Observation,
+)
 
 
 def _seed_capture(db, items):
     """Create a device + capture + observation whose raw_json holds `items`."""
-    device = Device(name="Cam", token_hash="deadbeef")
+    device = Device(name="Cam", token_hash=f"deadbeef-{uuid4()}")
     db.add(device)
     db.flush()
 
@@ -91,6 +99,15 @@ def test_reject_detection_removes_vision_added_state(client, db):
     )
     item, state = _seed_item(db, "Milk", count=2, confidence=0.9, is_manual=False)
     state_id = state.id
+    db.add(
+        InventoryEvent(
+            item_id=item.id,
+            capture_id=capture.id,
+            event_type="seen",
+            delta=2,
+        )
+    )
+    db.commit()
 
     resp = client.post(f"/v1/captures/{capture.id}/detections/0/reject")
 
@@ -118,6 +135,61 @@ def test_reject_detection_preserves_manual_state(client, db):
     ), "manual (user-verified) state must survive a detection reject"
     assert kept.count_estimate == 4
     assert kept.is_manual is True
+
+
+def test_reject_detection_preserves_state_seen_by_another_capture(client, db):
+    """Rejecting one capture must not erase stock supported by another capture."""
+    capture = _seed_capture(
+        db, [{"name": "Milk", "quantity_estimate": 1, "confidence": 0.9}]
+    )
+    other_capture = _seed_capture(
+        db, [{"name": "Milk", "quantity_estimate": 3, "confidence": 0.95}]
+    )
+    item, state = _seed_item(db, "Milk", count=3, confidence=0.95, is_manual=False)
+    state_id = state.id
+    db.add_all(
+        [
+            InventoryEvent(
+                item_id=item.id,
+                capture_id=capture.id,
+                event_type="seen",
+                delta=1,
+            ),
+            InventoryEvent(
+                item_id=item.id,
+                capture_id=other_capture.id,
+                event_type="seen",
+                delta=3,
+            ),
+        ]
+    )
+    db.commit()
+
+    resp = client.post(f"/v1/captures/{capture.id}/detections/0/reject")
+
+    assert resp.status_code == 200
+    kept = db.query(InventoryState).filter(InventoryState.id == state_id).first()
+    assert kept is not None
+    assert kept.count_estimate == 3
+    assert "unchanged" in resp.json()["message"].lower()
+
+
+def test_reject_detection_preserves_state_without_capture_provenance(client, db):
+    """Legacy or unlinked vision state cannot safely be attributed to one capture."""
+    capture = _seed_capture(
+        db, [{"name": "Beans", "quantity_estimate": 1, "confidence": 0.9}]
+    )
+    item, state = _seed_item(db, "Beans", count=4, confidence=0.8, is_manual=False)
+    state_id = state.id
+
+    resp = client.post(f"/v1/captures/{capture.id}/detections/0/reject")
+
+    assert resp.status_code == 200
+    assert (
+        db.query(InventoryState).filter(InventoryState.id == state_id).first()
+        is not None
+    )
+    assert "unchanged" in resp.json()["message"].lower()
 
 
 def test_approve_detection_honours_explicit_count(client, db):

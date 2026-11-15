@@ -5,11 +5,13 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.db.models import (
     Capture,
+    InventoryEvent,
     InventoryItem,
     InventoryState,
     Observation,
@@ -171,13 +173,11 @@ def _add_to_inventory(
 def _remove_from_inventory(
     db: Session, capture: Capture, name: str, brand: Optional[str] = None
 ) -> bool:
-    """Remove an item from inventory that was added from this capture.
+    """Remove vision-only state only when this capture is its sole provenance.
 
-    InventoryState has no capture_id column (see app/db/models.py), so removal
-    cannot be scoped to the originating capture — adding that column would need
-    a migration. User-verified rows (is_manual=True) are never deleted here:
-    rejecting a vision detection must not throw away stock the household
-    confirmed by hand.
+    InventoryEvent records the capture that produced each vision observation.
+    Preserve state when provenance is missing or shared with another event;
+    otherwise rejecting one capture could erase stock supported elsewhere.
     """
     item = _find_existing_item(db, name, brand)
     if not item:
@@ -187,17 +187,44 @@ def _remove_from_inventory(
         db.query(InventoryState)
         .filter(
             InventoryState.item_id == item.id,
-            InventoryState.is_manual == False,
+            InventoryState.is_manual.is_(False),
         )
         .first()
     )
 
-    if state:
-        db.delete(state)
-        db.commit()
-        return True
+    if not state:
+        return False
 
-    return False
+    capture_event = (
+        db.query(InventoryEvent.id)
+        .filter(
+            InventoryEvent.item_id == item.id,
+            InventoryEvent.capture_id == capture.id,
+            InventoryEvent.event_type == "seen",
+        )
+        .first()
+    )
+    if not capture_event:
+        return False
+
+    other_event = (
+        db.query(InventoryEvent.id)
+        .filter(
+            InventoryEvent.item_id == item.id,
+            or_(
+                InventoryEvent.capture_id.is_(None),
+                InventoryEvent.capture_id != capture.id,
+                InventoryEvent.event_type != "seen",
+            ),
+        )
+        .first()
+    )
+    if other_event:
+        return False
+
+    db.delete(state)
+    db.commit()
+    return True
 
 
 # ── Routes ─────────────────────────────────────────────────────────────
@@ -413,11 +440,17 @@ async def reject_detection(
     name = (detected.get("name") or "").strip()
     brand = detected.get("brand")
 
-    _remove_from_inventory(db, capture, name, brand)
+    removed = _remove_from_inventory(db, capture, name, brand)
+
+    message = (
+        f"Rejected '{name}' and removed vision-only stock attributed only to this capture"
+        if removed
+        else f"Rejected '{name}'; any existing inventory was left unchanged because this detection cannot be tied exclusively to this capture"
+    )
 
     return DetectionActionResponse(
         success=True,
-        message=f"Rejected '{name}' — removed from inventory",
+        message=message,
         detection_index=index,
         capture_id=capture_id,
     )
