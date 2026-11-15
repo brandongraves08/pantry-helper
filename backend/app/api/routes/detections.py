@@ -5,7 +5,6 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
@@ -195,31 +194,23 @@ def _remove_from_inventory(
     if not state:
         return False
 
-    capture_event = (
-        db.query(InventoryEvent.id)
-        .filter(
-            InventoryEvent.item_id == item.id,
-            InventoryEvent.capture_id == capture.id,
-            InventoryEvent.event_type == "seen",
-        )
-        .first()
-    )
-    if not capture_event:
+    events = db.query(InventoryEvent).filter(InventoryEvent.item_id == item.id).all()
+    if not any(
+        event.capture_id == capture.id
+        and event.event_type == "seen"
+        and isinstance(event.details, dict)
+        and event.details.get("state_created_by_capture") is True
+        for event in events
+    ):
         return False
 
-    other_event = (
-        db.query(InventoryEvent.id)
-        .filter(
-            InventoryEvent.item_id == item.id,
-            or_(
-                InventoryEvent.capture_id.is_(None),
-                InventoryEvent.capture_id != capture.id,
-                InventoryEvent.event_type != "seen",
-            ),
-        )
-        .first()
-    )
-    if other_event:
+    if any(
+        event.capture_id != capture.id
+        or event.event_type != "seen"
+        or not isinstance(event.details, dict)
+        or event.details.get("state_created_by_capture") is not True
+        for event in events
+    ):
         return False
 
     db.delete(state)

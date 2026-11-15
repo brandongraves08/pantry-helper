@@ -105,6 +105,7 @@ def test_reject_detection_removes_vision_added_state(client, db):
             capture_id=capture.id,
             event_type="seen",
             delta=2,
+            details={"state_created_by_capture": True},
         )
     )
     db.commit()
@@ -181,6 +182,34 @@ def test_reject_detection_preserves_state_without_capture_provenance(client, db)
     )
     item, state = _seed_item(db, "Beans", count=4, confidence=0.8, is_manual=False)
     state_id = state.id
+
+    resp = client.post(f"/v1/captures/{capture.id}/detections/0/reject")
+
+    assert resp.status_code == 200
+    assert (
+        db.query(InventoryState).filter(InventoryState.id == state_id).first()
+        is not None
+    )
+    assert "unchanged" in resp.json()["message"].lower()
+
+
+def test_reject_detection_preserves_legacy_state_updated_by_capture(client, db):
+    """A new capture event does not prove that it created a pre-existing state."""
+    capture = _seed_capture(
+        db, [{"name": "Rice", "quantity_estimate": 2, "confidence": 0.9}]
+    )
+    item, state = _seed_item(db, "Rice", count=5, confidence=0.9, is_manual=False)
+    state_id = state.id
+    db.add(
+        InventoryEvent(
+            item_id=item.id,
+            capture_id=capture.id,
+            event_type="seen",
+            delta=2,
+            details={"state_created_by_capture": False},
+        )
+    )
+    db.commit()
 
     resp = client.post(f"/v1/captures/{capture.id}/detections/0/reject")
 

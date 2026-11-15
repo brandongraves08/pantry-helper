@@ -186,6 +186,7 @@ class CaptureProcessor:
                     .filter(InventoryState.item_id == inv_item.id)
                     .first()
                 )
+                state_created_by_capture = state is None
 
                 if state:
                     delta = qty - (state.count_estimate or 0)
@@ -210,6 +211,7 @@ class CaptureProcessor:
                     details={
                         "confidence": conf,
                         "trigger_type": capture.trigger_type,
+                        "state_created_by_capture": state_created_by_capture,
                     },
                 )
                 db.add(event)
