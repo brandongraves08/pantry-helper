@@ -9,6 +9,12 @@ depends_on = None
 
 
 def upgrade() -> None:
+    # main.py runs Base.metadata.create_all() during app startup before the
+    # deploy script invokes Alembic. If that startup already created this new
+    # model table, keep its data and let Alembic advance the revision.
+    if sa.inspect(op.get_bind()).has_table("prepping_gear"):
+        return
+
     op.create_table(
         "prepping_gear",
         sa.Column("id", sa.String(), nullable=False),
