@@ -76,6 +76,26 @@ export const overrideInventory = async (payload) => {
   return data
 }
 
+// Prepping Gear API
+export const listGear = async (params = {}) => {
+  const { data } = await apiClient.get('/v1/gear', { params })
+  return data
+}
+
+export const createGear = async (payload) => {
+  const { data } = await apiClient.post('/v1/gear', payload)
+  return data
+}
+
+export const updateGear = async (id, payload) => {
+  const { data } = await apiClient.patch(`/v1/gear/${id}`, payload)
+  return data
+}
+
+export const deleteGear = async (id) => {
+  await apiClient.delete(`/v1/gear/${id}`)
+}
+
 // Devices API
 export const listDevices = async () => {
   const { data } = await apiClient.get('/v1/devices')

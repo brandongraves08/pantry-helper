@@ -2,8 +2,10 @@ from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime, date
 
+
 class IngestRequest(BaseModel):
     """Ingest request from ESP32"""
+
     device_id: str
     timestamp: datetime
     trigger_type: str  # door, light, timer, manual
@@ -11,8 +13,10 @@ class IngestRequest(BaseModel):
     rssi: int
     # Image is handled as multipart form data
 
+
 class CaptureResponse(BaseModel):
     """Response to ingest request"""
+
     capture_id: str
     status: str
     message: Optional[str] = None
@@ -29,8 +33,10 @@ class CaptureDetail(BaseModel):
 
     latest_observation: Optional[dict] = None
 
+
 class InventoryItem(BaseModel):
     """Inventory item representation"""
+
     item_id: Optional[str] = None
     canonical_name: str
     brand: Optional[str] = None
@@ -64,8 +70,10 @@ class InventoryItem(BaseModel):
     notes: Optional[str] = None
     image_url: Optional[str] = None
 
+
 class InventoryResponse(BaseModel):
     """Full inventory response"""
+
     items: List[InventoryItem]
     updated_at: datetime
     total: Optional[int] = None
@@ -73,14 +81,17 @@ class InventoryResponse(BaseModel):
     page_size: Optional[int] = None
     has_more: Optional[bool] = None
 
+
 class ObservationItem(BaseModel):
     """Parsed observation item from OpenAI Vision"""
+
     name: str
     brand: Optional[str] = None
     package_type: Optional[str] = None
     quantity_estimate: Optional[int] = None
     confidence: float
     expiry_date: Optional[str] = None  # ISO date extracted from label
+
 
 class VisionOutput(BaseModel):
     scene_type: Optional[str] = None
@@ -89,8 +100,10 @@ class VisionOutput(BaseModel):
     items: List[ObservationItem]
     notes: Optional[str] = None
 
+
 class InventoryOverride(BaseModel):
     """Manual inventory correction"""
+
     item_name: str
     count_estimate: int
     notes: Optional[str] = None
@@ -105,12 +118,14 @@ class InventoryOverride(BaseModel):
 
 class InventoryVerifyRequest(BaseModel):
     """User-confirmed count for an inventory item."""
+
     count_estimate: int
     notes: Optional[str] = None
 
 
 class HebEnrichmentPayload(BaseModel):
     """HEB product info pulled from heb.com for an inventory item."""
+
     product_name: Optional[str] = None
     url: Optional[str] = None
     price: Optional[float] = None
@@ -119,23 +134,27 @@ class HebEnrichmentPayload(BaseModel):
 
 class FlagCreate(BaseModel):
     """User-reported issue on an inventory item."""
+
     field: Optional[str] = None  # image | brand | count | name | other
     reason: str
 
 
 class VoiceShoppingAdd(BaseModel):
     """Add an item to the shopping list by name (Alexa/voice path)."""
+
     item_name: str
     quantity: int = 1
 
 
 class FlagResolve(BaseModel):
     """Mark a flag resolved (after the agent/admin fixed the underlying issue)."""
+
     resolution_note: Optional[str] = None
 
 
 class FlagResponse(BaseModel):
     """An inventory flag as returned by the API."""
+
     id: str
     item_id: str
     canonical_name: Optional[str] = None
@@ -172,10 +191,13 @@ class ReviewResponse(BaseModel):
     created_at: datetime
     resolved_at: Optional[datetime] = None
 
+
 # Barcode Schemas
+
 
 class BarcodeLookupRequest(BaseModel):
     """Request to look up a barcode."""
+
     barcode: str
 
 
@@ -191,6 +213,7 @@ class BarcodeLookupNutrition(BaseModel):
 
 class BarcodeLookupResult(BaseModel):
     """Result of a barcode lookup."""
+
     barcode: str
     found: bool = False
     product_name: Optional[str] = None
@@ -210,12 +233,14 @@ class BarcodeLookupResult(BaseModel):
 
 class BarcodeLinkRequest(BaseModel):
     """Link a barcode to an inventory item."""
+
     barcode: str
     inventory_item_name: str
 
 
 class BarcodeLinkResponse(BaseModel):
     """Response after linking barcode to an item."""
+
     success: bool
     barcode: str
     inventory_item_name: str
@@ -224,6 +249,7 @@ class BarcodeLinkResponse(BaseModel):
 
 class BarcodeAddToInventoryRequest(BaseModel):
     """Add a barcode-scanned product directly to inventory."""
+
     barcode: str
     product_name: str
     brand: Optional[str] = None
@@ -236,8 +262,10 @@ class BarcodeAddToInventoryRequest(BaseModel):
 
 # Recipe Schemas
 
+
 class RecipeIngredientInput(BaseModel):
     """An ingredient line in a recipe."""
+
     quantity: Optional[str] = None
     name: str
     note: Optional[str] = None
@@ -246,6 +274,7 @@ class RecipeIngredientInput(BaseModel):
 
 class RecipeCreate(BaseModel):
     """Request to create or update a recipe."""
+
     name: str
     description: Optional[str] = None
     source: Optional[str] = None
@@ -260,6 +289,7 @@ class RecipeCreate(BaseModel):
 
 class RecipeIngredient(BaseModel):
     """An ingredient line as returned in a recipe."""
+
     id: str
     position: int
     quantity: Optional[str] = None
@@ -271,6 +301,7 @@ class RecipeIngredient(BaseModel):
 
 class Recipe(BaseModel):
     """A saved recipe."""
+
     id: str
     name: str
     description: Optional[str] = None
@@ -288,12 +319,14 @@ class Recipe(BaseModel):
 
 class RecipeListResponse(BaseModel):
     """List of recipes."""
+
     recipes: List[Recipe]
     total: int
 
 
 class RecipeSuggestion(BaseModel):
     """A recipe scored by stock match."""
+
     recipe: Recipe
     total_ingredients: int
     in_stock: int
@@ -304,26 +337,31 @@ class RecipeSuggestion(BaseModel):
 
 class RecipeSuggestResponse(BaseModel):
     """Suggested recipes ranked by what you can cook tonight."""
+
     suggestions: List[RecipeSuggestion]
     inventory_items: int  # total tracked items considered
 
 
 # Device Management Schemas
 
+
 class DeviceCreate(BaseModel):
     """Request to create a new device"""
+
     name: str
     device_id: Optional[str] = None  # Auto-generated if not provided
 
 
 class DeviceUpdate(BaseModel):
     """Request to update device settings"""
+
     name: Optional[str] = None
     enabled: Optional[bool] = None
 
 
 class DeviceResponse(BaseModel):
     """Device information response"""
+
     id: str
     name: str
     created_at: datetime
@@ -339,6 +377,7 @@ class DeviceResponse(BaseModel):
 
 class DeviceListResponse(BaseModel):
     """Paginated list of devices"""
+
     items: List[DeviceResponse]
     total: int
     skip: int
@@ -347,6 +386,7 @@ class DeviceListResponse(BaseModel):
 
 class DeviceHealthResponse(BaseModel):
     """Detailed device health metrics"""
+
     device_id: str
     is_healthy: bool
     battery_v: Optional[float] = None
@@ -365,14 +405,17 @@ class DeviceHealthResponse(BaseModel):
 
 # ── Meal Plan Schemas ────────────────────────────────────────────────
 
+
 class MealPlanCreate(BaseModel):
     """Create a weekly meal plan."""
+
     week_start: date  # Monday of the plan week
     name: Optional[str] = None
 
 
 class MealPlanEntryInput(BaseModel):
     """Schedule a recipe on a specific day/meal slot."""
+
     plan_date: date
     meal_type: str  # breakfast | lunch | dinner | snack
     recipe_id: str
@@ -382,6 +425,7 @@ class MealPlanEntryInput(BaseModel):
 
 class MealPlanEntryResponse(BaseModel):
     """A single scheduled meal."""
+
     id: str
     plan_date: date
     meal_type: str
@@ -393,6 +437,7 @@ class MealPlanEntryResponse(BaseModel):
 
 class MealPlanResponse(BaseModel):
     """A meal plan with its entries."""
+
     id: str
     week_start: date
     name: Optional[str] = None
@@ -403,12 +448,14 @@ class MealPlanResponse(BaseModel):
 
 class MealPlanListResponse(BaseModel):
     """List of meal plans."""
+
     plans: List[MealPlanResponse]
     total: int
 
 
 class MealPlanItemNeed(BaseModel):
     """One ingredient's stock status across all planned meals."""
+
     name: str
     quantity: Optional[str] = None
     inventory_item_id: Optional[str] = None
@@ -418,12 +465,15 @@ class MealPlanItemNeed(BaseModel):
     missing_units: Optional[float] = None
     status: str  # ok | short | not_tracked
     approx: bool = False  # True when quantity math is a heuristic (weight/volume units)
-    sources: List[dict] = []  # [{date, meal_type, recipe, quantity, servings_multiplier}]
+    sources: List[dict] = (
+        []
+    )  # [{date, meal_type, recipe, quantity, servings_multiplier}]
     allergen_warnings: Optional[List[str]] = None  # Warnings about household allergens
 
 
 class MealPlanVerifyResponse(BaseModel):
     """Aggregated verification of a meal plan against pantry stock."""
+
     plan_id: str
     week_start: date
     start: date
@@ -435,6 +485,7 @@ class MealPlanVerifyResponse(BaseModel):
 
 class MealPlanUpdateShoppingResponse(BaseModel):
     """Result of merging missing meal-plan items into the shopping list."""
+
     plan_id: str
     added: int
     items: List[MealPlanItemNeed]

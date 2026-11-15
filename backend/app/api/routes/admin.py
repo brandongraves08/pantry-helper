@@ -29,7 +29,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-
 @router.get("/admin/stats")
 async def get_system_stats(db: Session = Depends(get_db)):
     """Get system statistics and job queue status."""
@@ -88,7 +87,7 @@ async def process_capture(
 ):
     """
     Process a single image capture.
-    
+
     Args:
         capture_id: ID of capture to process
         sync: If True, wait for result; if False, queue asynchronously (default)
@@ -108,7 +107,9 @@ async def process_capture(
             # Create observation
             observation = Observation(
                 capture_id=capture.id,
-                raw_json=result.model_dump() if hasattr(result, "model_dump") else result,
+                raw_json=(
+                    result.model_dump() if hasattr(result, "model_dump") else result
+                ),
                 scene_confidence=getattr(result, "scene_confidence", None),
             )
             db.add(observation)
@@ -145,15 +146,12 @@ async def process_pending(
 ):
     """
     Process all pending captures.
-    
+
     Args:
         sync: If True, process synchronously; if False, queue batch job
     """
     pending = (
-        db.query(Capture)
-        .filter(Capture.status == STATUS_STORED)
-        .limit(limit)
-        .all()
+        db.query(Capture).filter(Capture.status == STATUS_STORED).limit(limit).all()
     )
 
     if not pending:
@@ -176,7 +174,11 @@ async def process_pending(
                     result = analyzer.analyze_image(capture.image_path)
                     observation = Observation(
                         capture_id=capture.id,
-                        raw_json=result.model_dump() if hasattr(result, "model_dump") else result,
+                        raw_json=(
+                            result.model_dump()
+                            if hasattr(result, "model_dump")
+                            else result
+                        ),
                         scene_confidence=getattr(result, "scene_confidence", None),
                     )
                     db.add(observation)
@@ -212,7 +214,7 @@ async def get_task_status(task_id: str):
     from celery.result import AsyncResult
 
     task = AsyncResult(task_id, app=celery_app)
-    
+
     return {
         "task_id": task_id,
         "state": task.state,
@@ -227,7 +229,7 @@ async def get_task_status(task_id: str):
 async def cancel_task(task_id: str):
     """Cancel a running or queued task."""
     celery_app.control.revoke(task_id, terminate=True)
-    
+
     return {
         "task_id": task_id,
         "status": "cancelled",
@@ -239,7 +241,7 @@ async def get_queue_info():
     """Get detailed information about the job queue."""
     try:
         inspect = celery_app.control.inspect()
-        
+
         active = inspect.active() or {}
         reserved = inspect.reserved() or {}
         stats = inspect.stats() or {}
@@ -265,12 +267,13 @@ async def get_queue_info():
 async def get_storage_stats():
     """Get storage statistics and usage information."""
     logger.info("Getting storage statistics...")
-    
+
     try:
         from app.services.storage import get_storage_manager
+
         storage_mgr = get_storage_manager()
         stats = storage_mgr.get_storage_stats()
-        
+
         return {
             "status": "ok",
             "storage": stats,
@@ -287,26 +290,27 @@ async def cleanup_storage(
 ):
     """
     Enforce image retention policy and cleanup old images.
-    
+
     Parameters:
     - days: Keep images newer than this many days
     - dry_run: If True, only report what would be deleted (not implemented in v1)
     """
     logger.info(f"Cleanup storage requested (days={days})")
-    
+
     try:
         from app.workers.retention import get_retention_enforcer
+
         enforcer = get_retention_enforcer()
-        
+
         # Override retention if specified
         original_retention = enforcer.retention_days
         enforcer.retention_days = days
-        
+
         result = enforcer.enforce_retention()
-        
+
         # Restore original retention
         enforcer.retention_days = original_retention
-        
+
         return {
             "status": "success" if result["success"] else "error",
             "result": result,
@@ -322,17 +326,18 @@ async def cleanup_failed_captures(
 ):
     """
     Clean up images from failed captures older than X days.
-    
+
     Parameters:
     - days: Delete failed capture images older than this many days
     """
     logger.info(f"Cleanup failed captures requested (days={days})")
-    
+
     try:
         from app.workers.retention import get_retention_enforcer
+
         enforcer = get_retention_enforcer()
         result = enforcer.cleanup_failed_captures(days=days)
-        
+
         return {
             "status": "success" if result["success"] else "error",
             "result": result,
@@ -348,17 +353,18 @@ async def check_storage_quota(
 ):
     """
     Check storage quota and trigger cleanup if needed.
-    
+
     Parameters:
     - max_mb: Maximum storage allowed in MB
     """
     logger.info(f"Checking storage quota (limit={max_mb} MB)...")
-    
+
     try:
         from app.workers.retention import get_retention_enforcer
+
         enforcer = get_retention_enforcer()
         result = enforcer.check_storage_quota(max_storage_mb=max_mb)
-        
+
         return {
             "status": "ok",
             "result": result,
@@ -372,16 +378,17 @@ async def check_storage_quota(
 async def cleanup_orphaned_images():
     """
     Delete orphaned images (files without corresponding DB records).
-    
+
     This is useful after manual database maintenance or failed uploads.
     """
     logger.info("Cleaning orphaned images...")
-    
+
     try:
         from app.services.storage import get_storage_manager
+
         storage_mgr = get_storage_manager()
         deleted = storage_mgr.cleanup_orphaned_images()
-        
+
         return {
             "status": "success",
             "deleted_count": deleted,

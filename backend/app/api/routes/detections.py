@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.db.database import get_db
 from app.db.models import (
     Capture,
+    InventoryEvent,
     InventoryItem,
     InventoryState,
     Observation,
@@ -55,6 +56,7 @@ class DetectionsResponse(BaseModel):
 
 class ApproveDetectionRequest(BaseModel):
     """Optional overrides when approving a detection."""
+
     name: Optional[str] = None
     brand: Optional[str] = None
     package_type: Optional[str] = None
@@ -84,11 +86,20 @@ class DetectionActionResponse(BaseModel):
 # ── Helpers ────────────────────────────────────────────────────────────
 
 
-def _find_existing_item(db: Session, name: str, brand: Optional[str] = None) -> Optional[InventoryItem]:
-    """Find an inventory item matching name (and brand if given)."""
+def _find_existing_item(
+    db: Session, name: str, brand: Optional[str] = None
+) -> Optional[InventoryItem]:
+    """Find an inventory item matching name (preferring the given brand).
+
+    ``inventory_items.canonical_name`` is UNIQUE (app/db/models.py), so a brand
+    mismatch must still resolve to the existing row: returning None here made the
+    caller INSERT a duplicate name and fail with a UNIQUE violation (HTTP 500).
+    """
     q = db.query(InventoryItem).filter(InventoryItem.canonical_name.ilike(name.strip()))
     if brand:
-        q = q.filter(InventoryItem.brand.ilike(brand.strip()))
+        match = q.filter(InventoryItem.brand.ilike(brand.strip())).first()
+        if match:
+            return match
     return q.first()
 
 
@@ -99,11 +110,16 @@ def _add_to_inventory(
     brand: Optional[str] = None,
     package_type: Optional[str] = None,
     quantity_estimate: Optional[int] = None,
-    count: int = 1,
+    count: Optional[int] = None,
     par_level: Optional[int] = None,
     expires_at: Optional[str] = None,
 ) -> tuple[InventoryItem, InventoryState]:
-    """Add an item to inventory from a detection."""
+    """Add an item to inventory from a detection.
+
+    ``count`` is the reviewer-confirmed quantity and always wins. The vision
+    pipeline's ``quantity_estimate`` is only a fallback for callers that have no
+    confirmed count (count is None).
+    """
     item = _find_existing_item(db, name, brand)
     if not item:
         item = InventoryItem(
@@ -114,12 +130,18 @@ def _add_to_inventory(
         db.add(item)
         db.flush()
 
-    state = db.query(InventoryState).filter(
-        InventoryState.item_id == item.id,
-    ).first()
+    effective_count = count if count is not None else (quantity_estimate or 1)
+
+    state = (
+        db.query(InventoryState)
+        .filter(
+            InventoryState.item_id == item.id,
+        )
+        .first()
+    )
 
     if state:
-        state.count_estimate = count
+        state.count_estimate = effective_count
         state.confidence = 1.0
         state.is_manual = True
         if par_level is not None:
@@ -127,7 +149,7 @@ def _add_to_inventory(
     else:
         state = InventoryState(
             item_id=item.id,
-            count_estimate=count,
+            count_estimate=effective_count,
             par_level=par_level or 0,
             confidence=1.0,
             is_manual=True,
@@ -141,42 +163,59 @@ def _add_to_inventory(
         except ValueError:
             pass
 
-    if quantity_estimate:
-        state.count_estimate = quantity_estimate
-
     db.commit()
     db.refresh(item)
     db.refresh(state)
     return item, state
 
 
-def _remove_from_inventory(db: Session, capture: Capture, name: str, brand: Optional[str] = None) -> bool:
-    """Remove an item from inventory that was added from this capture."""
+def _remove_from_inventory(
+    db: Session, capture: Capture, name: str, brand: Optional[str] = None
+) -> bool:
+    """Remove vision-only state only when this capture is its sole provenance.
+
+    InventoryEvent records the capture that produced each vision observation.
+    Preserve state when provenance is missing or shared with another event;
+    otherwise rejecting one capture could erase stock supported elsewhere.
+    """
     item = _find_existing_item(db, name, brand)
     if not item:
         return False
 
-    state = db.query(InventoryState).filter(
-        InventoryState.item_id == item.id,
-        InventoryState.capture_id == capture.id,
-        InventoryState.is_manual == False,
-    ).first()
+    state = (
+        db.query(InventoryState)
+        .filter(
+            InventoryState.item_id == item.id,
+            InventoryState.is_manual.is_(False),
+        )
+        .first()
+    )
 
-    if state:
-        db.delete(state)
-        db.commit()
-        return True
+    if not state:
+        return False
 
-    # Fallback: remove any state with this name
-    state = db.query(InventoryState).filter(
-        InventoryState.item_id == item.id,
-    ).first()
-    if state:
-        db.delete(state)
-        db.commit()
-        return True
+    events = db.query(InventoryEvent).filter(InventoryEvent.item_id == item.id).all()
+    if not any(
+        event.capture_id == capture.id
+        and event.event_type == "seen"
+        and isinstance(event.details, dict)
+        and event.details.get("state_created_by_capture") is True
+        for event in events
+    ):
+        return False
 
-    return False
+    if any(
+        event.capture_id != capture.id
+        or event.event_type != "seen"
+        or not isinstance(event.details, dict)
+        or event.details.get("state_created_by_capture") is not True
+        for event in events
+    ):
+        return False
+
+    db.delete(state)
+    db.commit()
+    return True
 
 
 # ── Routes ─────────────────────────────────────────────────────────────
@@ -236,9 +275,11 @@ async def list_detections(capture_id: str, db: Session = Depends(get_db)):
             current_par = None
 
             if existing_item:
-                state = db.query(InventoryState).filter(
-                    InventoryState.item_id == existing_item.id
-                ).first()
+                state = (
+                    db.query(InventoryState)
+                    .filter(InventoryState.item_id == existing_item.id)
+                    .first()
+                )
                 if state and state.confidence > 0:
                     in_inventory = True
                     state_id = state.id
@@ -246,21 +287,23 @@ async def list_detections(capture_id: str, db: Session = Depends(get_db)):
                     current_count = state.count_estimate
                     current_par = state.par_level
 
-            items.append(DetectionItem(
-                index=idx,
-                observation_id=obs.id,
-                capture_id=capture_id,
-                name=name,
-                brand=brand,
-                package_type=detected.get("package_type"),
-                quantity_estimate=detected.get("quantity_estimate"),
-                confidence=confidence,
-                in_inventory=in_inventory,
-                inventory_item_id=item_id,
-                inventory_state_id=state_id,
-                current_count=current_count,
-                current_par=current_par,
-            ))
+            items.append(
+                DetectionItem(
+                    index=idx,
+                    observation_id=obs.id,
+                    capture_id=capture_id,
+                    name=name,
+                    brand=brand,
+                    package_type=detected.get("package_type"),
+                    quantity_estimate=detected.get("quantity_estimate"),
+                    confidence=confidence,
+                    in_inventory=in_inventory,
+                    inventory_item_id=item_id,
+                    inventory_state_id=state_id,
+                    current_count=current_count,
+                    current_par=current_par,
+                )
+            )
 
     items.sort(key=lambda x: x.confidence, reverse=True)
     for i, item in enumerate(items):
@@ -274,7 +317,10 @@ async def list_detections(capture_id: str, db: Session = Depends(get_db)):
     )
 
 
-@router.post("/captures/{capture_id}/detections/{index}/approve", response_model=DetectionActionResponse)
+@router.post(
+    "/captures/{capture_id}/detections/{index}/approve",
+    response_model=DetectionActionResponse,
+)
 async def approve_detection(
     capture_id: str,
     index: int,
@@ -293,7 +339,9 @@ async def approve_detection(
         .first()
     )
     if not obs or not obs.raw_json:
-        raise HTTPException(status_code=404, detail="No observations found for this capture")
+        raise HTTPException(
+            status_code=404, detail="No observations found for this capture"
+        )
 
     raw = obs.raw_json
     item_list = []
@@ -303,23 +351,35 @@ async def approve_detection(
         item_list = raw
 
     if index < 0 or index >= len(item_list):
-        raise HTTPException(status_code=400, detail=f"Detection index {index} out of range (0-{len(item_list)-1})")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Detection index {index} out of range (0-{len(item_list)-1})",
+        )
 
     detected = item_list[index]
     name = (req.name if req and req.name else detected.get("name") or "").strip()
     if not name:
         raise HTTPException(status_code=400, detail="Item name is required")
 
-    count = req.count if req and req.count is not None else detected.get("quantity_estimate", 1)
+    # Only an explicit reviewer count overrides the vision estimate; None lets
+    # _add_to_inventory fall back to the detection's quantity_estimate.
+    count = req.count if req and req.count is not None else None
     _add_to_inventory(
-        db, capture,
+        db,
+        capture,
         name=name,
         brand=req.brand if req and req.brand else detected.get("brand"),
-        package_type=req.package_type if req and req.package_type else detected.get("package_type"),
+        package_type=(
+            req.package_type
+            if req and req.package_type
+            else detected.get("package_type")
+        ),
         quantity_estimate=detected.get("quantity_estimate"),
         count=count,
         par_level=req.par_level if req else None,
-        expires_at=(req.expires_at if req and req.expires_at else detected.get("expiry_date")),
+        expires_at=(
+            req.expires_at if req and req.expires_at else detected.get("expiry_date")
+        ),
     )
 
     return DetectionActionResponse(
@@ -330,7 +390,10 @@ async def approve_detection(
     )
 
 
-@router.post("/captures/{capture_id}/detections/{index}/reject", response_model=DetectionActionResponse)
+@router.post(
+    "/captures/{capture_id}/detections/{index}/reject",
+    response_model=DetectionActionResponse,
+)
 async def reject_detection(
     capture_id: str,
     index: int,
@@ -348,7 +411,9 @@ async def reject_detection(
         .first()
     )
     if not obs or not obs.raw_json:
-        raise HTTPException(status_code=404, detail="No observations found for this capture")
+        raise HTTPException(
+            status_code=404, detail="No observations found for this capture"
+        )
 
     raw = obs.raw_json
     item_list = []
@@ -358,23 +423,34 @@ async def reject_detection(
         item_list = raw
 
     if index < 0 or index >= len(item_list):
-        raise HTTPException(status_code=400, detail=f"Detection index {index} out of range")
+        raise HTTPException(
+            status_code=400, detail=f"Detection index {index} out of range"
+        )
 
     detected = item_list[index]
     name = (detected.get("name") or "").strip()
     brand = detected.get("brand")
 
-    _remove_from_inventory(db, capture, name, brand)
+    removed = _remove_from_inventory(db, capture, name, brand)
+
+    message = (
+        f"Rejected '{name}' and removed vision-only stock attributed only to this capture"
+        if removed
+        else f"Rejected '{name}'; any existing inventory was left unchanged because this detection cannot be tied exclusively to this capture"
+    )
 
     return DetectionActionResponse(
         success=True,
-        message=f"Rejected '{name}' — removed from inventory",
+        message=message,
         detection_index=index,
         capture_id=capture_id,
     )
 
 
-@router.post("/captures/{capture_id}/detections/{index}/edit", response_model=DetectionActionResponse)
+@router.post(
+    "/captures/{capture_id}/detections/{index}/edit",
+    response_model=DetectionActionResponse,
+)
 async def edit_detection(
     capture_id: str,
     index: int,
@@ -390,7 +466,8 @@ async def edit_detection(
         raise HTTPException(status_code=400, detail="Item name is required")
 
     _add_to_inventory(
-        db, capture,
+        db,
+        capture,
         name=req.name,
         brand=req.brand,
         package_type=req.package_type,

@@ -5,6 +5,7 @@ agent (Hermes) lists open flags via GET /v1/inventory/flags, fixes the underlyin
 item, then resolves the flag. This closes the loop on bad OFF image backfills and
 wrong-brand matches.
 """
+
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -42,7 +43,10 @@ async def flag_item(item_id: str, payload: FlagCreate, db: Session = Depends(get
 
     field = payload.field
     if field is not None and field not in ALLOWED_FIELDS:
-        raise HTTPException(status_code=422, detail=f"field must be one of: {', '.join(sorted(ALLOWED_FIELDS))}")
+        raise HTTPException(
+            status_code=422,
+            detail=f"field must be one of: {', '.join(sorted(ALLOWED_FIELDS))}",
+        )
     reason = (payload.reason or "").strip()
     if not reason:
         raise HTTPException(status_code=422, detail="reason is required")
@@ -92,7 +96,9 @@ async def list_item_flags(item_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/inventory/flags/{flag_id}/resolve", response_model=FlagResponse)
-async def resolve_flag(flag_id: str, payload: FlagResolve, db: Session = Depends(get_db)):
+async def resolve_flag(
+    flag_id: str, payload: FlagResolve, db: Session = Depends(get_db)
+):
     """Mark a flag resolved (after the underlying issue was fixed)."""
     flag = db.query(InventoryFlag).filter(InventoryFlag.id == flag_id).first()
     if not flag:

@@ -46,25 +46,31 @@ class RequestLogMiddleware(BaseHTTPMiddleware):
         start = time.monotonic()
 
         # Log incoming request
-        log("Request started", extra={
-            "request_id": request_id,
-            "method": method,
-            "path": path,
-            "query": query,
-            "client_ip": client_ip,
-            "user_agent": user_agent[:200],
-        })
+        log(
+            "Request started",
+            extra={
+                "request_id": request_id,
+                "method": method,
+                "path": path,
+                "query": query,
+                "client_ip": client_ip,
+                "user_agent": user_agent[:200],
+            },
+        )
 
         try:
             response = await call_next(request)
             status_code = response.status_code
         except Exception as exc:
-            logger.exception("Request failed", extra={
-                "request_id": request_id,
-                "method": method,
-                "path": path,
-                "error": str(exc),
-            })
+            logger.exception(
+                "Request failed",
+                extra={
+                    "request_id": request_id,
+                    "method": method,
+                    "path": path,
+                    "error": str(exc),
+                },
+            )
             raise
 
         duration_ms = (time.monotonic() - start) * 1000

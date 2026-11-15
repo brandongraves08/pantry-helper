@@ -1,4 +1,5 @@
 """Authentication utilities for ESP32 device tokens and shared API access."""
+
 import hashlib
 import hmac
 import secrets
@@ -30,9 +31,7 @@ class TokenManager:
     @staticmethod
     def verify_token(token: str, token_hash: str) -> bool:
         """Constant-time comparison of token against stored hash."""
-        return hmac.compare_digest(
-            TokenManager.hash_token(token), token_hash
-        )
+        return hmac.compare_digest(TokenManager.hash_token(token), token_hash)
 
 
 def get_current_device(
@@ -73,6 +72,7 @@ def authenticate_device(
     """Direct authentication for non-FastAPI contexts."""
     if not db:
         from app.db.database import SessionLocal
+
         db = SessionLocal()
 
     try:

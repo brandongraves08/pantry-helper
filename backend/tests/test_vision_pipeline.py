@@ -80,6 +80,7 @@ def test_vision_output_scene_type_default_none():
 def test_vision_prompt_contains_calibration():
     """Test that the vision prompt includes confidence calibration."""
     from app.services.vision import VisionAnalyzer
+
     analyzer = VisionAnalyzer(provider="mock")
     prompt = analyzer._build_prompt()
     assert "CONFIDENCE 0.9" in prompt
@@ -92,6 +93,7 @@ def test_vision_prompt_contains_calibration():
 def test_vision_prompt_contains_scene_type():
     """Test that the vision prompt includes scene_type."""
     from app.services.vision import VisionAnalyzer
+
     analyzer = VisionAnalyzer(provider="mock")
     prompt = analyzer._build_prompt()
     assert "scene_type" in prompt
@@ -102,6 +104,7 @@ def test_vision_prompt_contains_scene_type():
 def test_vision_prompt_contains_expiry():
     """Test that the vision prompt includes expiry date extraction."""
     from app.services.vision import VisionAnalyzer
+
     analyzer = VisionAnalyzer(provider="mock")
     prompt = analyzer._build_prompt()
     assert "expiry_date" in prompt
@@ -111,10 +114,20 @@ def test_vision_prompt_contains_expiry():
 def test_vision_prompt_json_structure():
     """Test that the prompt describes a valid JSON structure matching our schema."""
     from app.services.vision import VisionAnalyzer
+
     analyzer = VisionAnalyzer(provider="mock")
     prompt = analyzer._build_prompt()
-    fields = ["scene_type", "scene_confidence", "items", "name",
-              "brand", "package_type", "quantity_estimate", "confidence",
-              "expiry_date", "notes"]
+    fields = [
+        "scene_type",
+        "scene_confidence",
+        "items",
+        "name",
+        "brand",
+        "package_type",
+        "quantity_estimate",
+        "confidence",
+        "expiry_date",
+        "notes",
+    ]
     for field in fields:
         assert field in prompt, f"Prompt missing field: {field}"

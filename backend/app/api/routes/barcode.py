@@ -3,6 +3,7 @@
 Look up product info from barcodes via Open Food Facts,
 link barcodes to inventory items, and add scanned items to inventory.
 """
+
 import logging
 from datetime import datetime
 
@@ -35,9 +36,9 @@ async def scan_barcode(barcode: str, db: Session = Depends(get_db)):
     logger.info("Barcode lookup", extra={"barcode": barcode})
 
     # Check local cache first
-    cached = db.query(BarcodeLookup).filter(
-        BarcodeLookup.barcode == barcode.strip()
-    ).first()
+    cached = (
+        db.query(BarcodeLookup).filter(BarcodeLookup.barcode == barcode.strip()).first()
+    )
 
     if cached:
         logger.info("Barcode found in local cache", extra={"barcode": barcode})
@@ -64,7 +65,9 @@ async def scan_barcode(barcode: str, db: Session = Depends(get_db)):
             allergens=cached.allergens_json or [],
             ingredients_text=cached.ingredients_text,
             already_in_inventory=cached.inventory_item_id is not None,
-            existing_item_name=cached.inventory_item.canonical_name if cached.inventory_item else None,
+            existing_item_name=(
+                cached.inventory_item.canonical_name if cached.inventory_item else None
+            ),
             source=cached.source or "cache",
         )
 
@@ -94,7 +97,9 @@ async def scan_barcode(barcode: str, db: Session = Depends(get_db)):
 
     nutrition = None
     if result.nutrition:
-        nutrition = BarcodeLookupNutrition(**{k: v for k, v in result.nutrition.items() if v is not None})
+        nutrition = BarcodeLookupNutrition(
+            **{k: v for k, v in result.nutrition.items() if v is not None}
+        )
 
     return BarcodeLookupResult(
         barcode=result.barcode,
@@ -122,27 +127,34 @@ async def link_barcode_to_item(
 
     This allows subsequent scans of the same barcode to reference the item.
     """
-    logger.info("Barcode link requested", extra={
-        "barcode": request.barcode,
-        "item_name": request.inventory_item_name,
-    })
+    logger.info(
+        "Barcode link requested",
+        extra={
+            "barcode": request.barcode,
+            "item_name": request.inventory_item_name,
+        },
+    )
 
     # Find or create the inventory item
-    item = db.query(InventoryItem).filter(
-        InventoryItem.canonical_name == request.inventory_item_name
-    ).first()
+    item = (
+        db.query(InventoryItem)
+        .filter(InventoryItem.canonical_name == request.inventory_item_name)
+        .first()
+    )
 
     if not item:
         raise HTTPException(
             status_code=404,
             detail=f"Inventory item '{request.inventory_item_name}' not found. "
-                   f"Add it to inventory first, or use the add-to-inventory endpoint.",
+            f"Add it to inventory first, or use the add-to-inventory endpoint.",
         )
 
     # Find or create the barcode lookup entry
-    barcode_entry = db.query(BarcodeLookup).filter(
-        BarcodeLookup.barcode == request.barcode.strip()
-    ).first()
+    barcode_entry = (
+        db.query(BarcodeLookup)
+        .filter(BarcodeLookup.barcode == request.barcode.strip())
+        .first()
+    )
 
     if not barcode_entry:
         # Try to look up the barcode first
@@ -163,10 +175,13 @@ async def link_barcode_to_item(
     barcode_entry.last_lookup_at = datetime.utcnow()
     db.commit()
 
-    logger.info("Barcode linked to inventory item", extra={
-        "barcode": request.barcode,
-        "item_id": item.id,
-    })
+    logger.info(
+        "Barcode linked to inventory item",
+        extra={
+            "barcode": request.barcode,
+            "item_id": item.id,
+        },
+    )
 
     return BarcodeLinkResponse(
         success=True,
@@ -185,15 +200,20 @@ async def add_barcode_to_inventory(
 
     Creates or updates an inventory item from barcode scan data.
     """
-    logger.info("Add barcode to inventory", extra={
-        "barcode": request.barcode,
-        "product_name": request.product_name,
-    })
+    logger.info(
+        "Add barcode to inventory",
+        extra={
+            "barcode": request.barcode,
+            "product_name": request.product_name,
+        },
+    )
 
     # Find or create inventory item
-    item = db.query(InventoryItem).filter(
-        InventoryItem.canonical_name == request.product_name
-    ).first()
+    item = (
+        db.query(InventoryItem)
+        .filter(InventoryItem.canonical_name == request.product_name)
+        .first()
+    )
 
     if not item:
         item = InventoryItem(
@@ -205,9 +225,13 @@ async def add_barcode_to_inventory(
         )
         db.add(item)
         db.flush()
-        logger.info("Created new inventory item from barcode", extra={
-            "item_id": item.id, "product": request.product_name,
-        })
+        logger.info(
+            "Created new inventory item from barcode",
+            extra={
+                "item_id": item.id,
+                "product": request.product_name,
+            },
+        )
 
     # Update existing item metadata if not already set
     if request.brand and not item.brand:
@@ -218,9 +242,7 @@ async def add_barcode_to_inventory(
         item.package_type = request.package_type
 
     # Update/create inventory state
-    state = db.query(InventoryState).filter(
-        InventoryState.item_id == item.id
-    ).first()
+    state = db.query(InventoryState).filter(InventoryState.item_id == item.id).first()
 
     if state:
         delta = request.quantity_estimate - (state.count_estimate or 0)
@@ -258,9 +280,11 @@ async def add_barcode_to_inventory(
     db.add(event)
 
     # Link barcode to this item
-    barcode_entry = db.query(BarcodeLookup).filter(
-        BarcodeLookup.barcode == request.barcode.strip()
-    ).first()
+    barcode_entry = (
+        db.query(BarcodeLookup)
+        .filter(BarcodeLookup.barcode == request.barcode.strip())
+        .first()
+    )
 
     if barcode_entry:
         barcode_entry.inventory_item_id = item.id

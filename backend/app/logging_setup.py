@@ -1,4 +1,5 @@
 """Loki log shipping configuration for Docker containers via Promtail."""
+
 import logging
 import os
 

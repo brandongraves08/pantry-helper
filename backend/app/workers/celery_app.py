@@ -1,4 +1,5 @@
 """Celery task queue configuration with structured logging."""
+
 from app.log_config import setup_logging
 
 logger = setup_logging("pantry-worker")
@@ -34,6 +35,7 @@ celery_app.conf.update(
 # Periodic (celery beat) schedule — runs when the worker is started with -B.
 # None of this runs automatically by default; see the worker command in compose.
 from celery.schedules import crontab  # noqa: E402
+
 celery_app.conf.beat_schedule = {
     "enforce-image-retention-daily": {
         "task": "app.workers.celery_app.enforce_image_retention",
@@ -46,25 +48,34 @@ class DatabaseTask(Task):
     """Task with database session management."""
 
     def on_retry(self, exc, task_id, args, kwargs, einfo):
-        logger.warning("Task retrying", extra={
-            "task_id": task_id,
-            "error": str(exc),
-            "retry_count": self.request.retries,
-        })
+        logger.warning(
+            "Task retrying",
+            extra={
+                "task_id": task_id,
+                "error": str(exc),
+                "retry_count": self.request.retries,
+            },
+        )
         super().on_retry(exc, task_id, args, kwargs, einfo)
 
     def on_failure(self, exc, task_id, args, kwargs, einfo):
-        logger.error("Task failed", extra={
-            "task_id": task_id,
-            "error": str(exc),
-        })
+        logger.error(
+            "Task failed",
+            extra={
+                "task_id": task_id,
+                "error": str(exc),
+            },
+        )
         super().on_failure(exc, task_id, args, kwargs, einfo)
 
     def on_success(self, retval, task_id, args, kwargs):
-        logger.info("Task completed", extra={
-            "task_id": task_id,
-            "result": retval,
-        })
+        logger.info(
+            "Task completed",
+            extra={
+                "task_id": task_id,
+                "result": retval,
+            },
+        )
         super().on_success(retval, task_id, args, kwargs)
 
 
@@ -83,16 +94,21 @@ def process_image_capture(self, capture_id: str) -> dict:
         success = processor.process_capture(capture_id)
 
         if success:
-            logger.info("Capture processed successfully", extra={"capture_id": capture_id})
+            logger.info(
+                "Capture processed successfully", extra={"capture_id": capture_id}
+            )
             return {"capture_id": capture_id, "status": "completed"}
         else:
             raise ValueError(f"Processing failed for capture {capture_id}")
 
     except Exception as exc:
-        logger.error("Error processing capture", extra={
-            "capture_id": capture_id,
-            "error": str(exc),
-        })
+        logger.error(
+            "Error processing capture",
+            extra={
+                "capture_id": capture_id,
+                "error": str(exc),
+            },
+        )
         if db:
             try:
                 capture = db.query(Capture).filter(Capture.id == capture_id).first()
@@ -102,7 +118,7 @@ def process_image_capture(self, capture_id: str) -> dict:
                     db.commit()
             except Exception:
                 pass
-        raise self.retry(exc=exc, countdown=min(2 ** self.request.retries, 600))
+        raise self.retry(exc=exc, countdown=min(2**self.request.retries, 600))
 
     finally:
         if db:
@@ -125,15 +141,18 @@ def process_pending_captures(self) -> dict:
                 process_image_capture.delay(capture.id)
                 processed_count += 1
             except Exception as e:
-                logger.error("Failed to queue capture", extra={
-                    "capture_id": capture.id,
-                    "error": str(e),
-                })
+                logger.error(
+                    "Failed to queue capture",
+                    extra={
+                        "capture_id": capture.id,
+                        "error": str(e),
+                    },
+                )
         logger.info("Batch queued", extra={"queued": processed_count})
         return {"queued_count": processed_count, "status": "queued"}
     except Exception as exc:
         logger.error("Batch processing error", extra={"error": str(exc)})
-        raise self.retry(exc=exc, countdown=min(2 ** self.request.retries, 600))
+        raise self.retry(exc=exc, countdown=min(2**self.request.retries, 600))
     finally:
         if db:
             db.close()
@@ -143,6 +162,7 @@ def process_pending_captures(self) -> dict:
 def enforce_image_retention(self) -> dict:
     """Periodic task: enforce image retention policy (delete images older than IMAGE_RETENTION_DAYS)."""
     from app.workers.retention import get_retention_enforcer
+
     logger.info("Running scheduled image retention enforcement")
     try:
         result = get_retention_enforcer().enforce_retention()

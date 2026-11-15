@@ -4,8 +4,10 @@ Covers: plain integers, decimals, unicode fractions (¼ ½ ¾ ⅓ ⅔),
 mixed numbers ("1 1/2"), ASCII fractions ("3/4"), leading qty in strings,
 approx flags for weight/volume units, and edge cases.
 """
+
 import sys
 import os
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from app.api.routes.meal_plans import parse_quantity
@@ -37,11 +39,11 @@ class TestParseQuantityUnicodeFractions:
 
     def test_third(self):
         val, approx = parse_quantity("⅓")
-        assert abs(val - 1/3) < 0.001
+        assert abs(val - 1 / 3) < 0.001
 
     def test_two_thirds(self):
         val, approx = parse_quantity("⅔")
-        assert abs(val - 2/3) < 0.001
+        assert abs(val - 2 / 3) < 0.001
 
     def test_mixed_number_unicode(self):
         """'1½' should parse as 1.5"""

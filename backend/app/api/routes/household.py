@@ -1,4 +1,5 @@
 """Household member management API"""
+
 from typing import List, Optional
 from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -24,9 +25,13 @@ class MemberUpdate(BaseModel):
 
 
 class RestrictionCreate(BaseModel):
-    restriction_type: str = Field(..., description="allergy, intolerance, preference, medical")
+    restriction_type: str = Field(
+        ..., description="allergy, intolerance, preference, medical"
+    )
     allergen: Optional[str] = None
-    severity: Optional[str] = Field(None, description="mild, moderate, severe, life_threatening")
+    severity: Optional[str] = Field(
+        None, description="mild, moderate, severe, life_threatening"
+    )
     notes: Optional[str] = None
 
 
@@ -86,7 +91,7 @@ def create_member(member_data: MemberCreate, db: Session = Depends(get_db)):
     member = HouseholdMember(
         name=member_data.name,
         member_relationship=member_data.relationship,
-        birth_date=member_data.birth_date
+        birth_date=member_data.birth_date,
     )
     db.add(member)
     db.commit()
@@ -113,7 +118,9 @@ def get_member(member_id: str, db: Session = Depends(get_db)):
 
 
 @router.patch("/members/{member_id}")
-def update_member(member_id: str, update_data: MemberUpdate, db: Session = Depends(get_db)):
+def update_member(
+    member_id: str, update_data: MemberUpdate, db: Session = Depends(get_db)
+):
     """Update household member details"""
     member = db.query(HouseholdMember).filter_by(id=member_id).first()
     if not member:
@@ -141,7 +148,9 @@ def deactivate_member(member_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/members/{member_id}/restrictions")
-def add_restriction(member_id: str, restriction_data: RestrictionCreate, db: Session = Depends(get_db)):
+def add_restriction(
+    member_id: str, restriction_data: RestrictionCreate, db: Session = Depends(get_db)
+):
     """Add a dietary restriction/allergy for a member"""
     member = db.query(HouseholdMember).filter_by(id=member_id).first()
     if not member:
@@ -152,7 +161,7 @@ def add_restriction(member_id: str, restriction_data: RestrictionCreate, db: Ses
         restriction_type=restriction_data.restriction_type,
         allergen=restriction_data.allergen,
         severity=restriction_data.severity,
-        notes=restriction_data.notes
+        notes=restriction_data.notes,
     )
     db.add(restriction)
     db.commit()
@@ -170,7 +179,9 @@ def list_restrictions(member_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/members/{member_id}/nutrition")
-def set_nutrition_target(member_id: str, target_data: NutritionTargetCreate, db: Session = Depends(get_db)):
+def set_nutrition_target(
+    member_id: str, target_data: NutritionTargetCreate, db: Session = Depends(get_db)
+):
     """Set nutrition targets for a household member"""
     member = db.query(HouseholdMember).filter_by(id=member_id).first()
     if not member:

@@ -104,9 +104,11 @@ async def get_item_nutrition(item_id: str, db: Session = Depends(get_db)):
     if not item:
         raise HTTPException(status_code=404, detail="Inventory item not found")
 
-    nf = db.query(NutritionFact).filter(
-        NutritionFact.inventory_item_id == item.id
-    ).first()
+    nf = (
+        db.query(NutritionFact)
+        .filter(NutritionFact.inventory_item_id == item.id)
+        .first()
+    )
 
     return NutritionInfoResponse(
         item_id=item.id,
@@ -136,9 +138,11 @@ async def save_item_nutrition(
     if not item:
         raise HTTPException(status_code=404, detail="Inventory item not found")
 
-    nf = db.query(NutritionFact).filter(
-        NutritionFact.inventory_item_id == item.id
-    ).first()
+    nf = (
+        db.query(NutritionFact)
+        .filter(NutritionFact.inventory_item_id == item.id)
+        .first()
+    )
 
     if nf:
         # Update existing

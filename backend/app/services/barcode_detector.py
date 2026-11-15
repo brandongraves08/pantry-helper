@@ -3,6 +3,7 @@
 Uses pyzbar (zbar wrapper) to detect barcodes in ESP32-captured images.
 If the system library is not available, gracefully degrades (no-op).
 """
+
 from dataclasses import dataclass
 import logging
 from typing import Optional
@@ -12,6 +13,7 @@ logger = logging.getLogger("pantry-api.barcode_detector")
 try:
     from PIL import Image
     from pyzbar.pyzbar import decode as pyzbar_decode
+
     HAVE_PYZBAR = True
 except ImportError:
     HAVE_PYZBAR = False
@@ -45,25 +47,37 @@ def detect_barcodes(image_path: str) -> list[DetectedBarcode]:
         results = []
         for obj in decoded:
             rect = obj.rect
-            results.append(DetectedBarcode(
-                data=obj.data.decode("utf-8", errors="replace"),
-                barcode_type=obj.type,
-                confidence=1.0 if len(decoded) == 1 else 0.8,
-                rect={
-                    "x": rect.left,
-                    "y": rect.top,
-                    "w": rect.width,
-                    "h": rect.height,
-                } if rect else None,
-            ))
-            logger.info("Barcode detected in image", extra={
-                "barcode": results[-1].data,
-                "type": obj.type,
-            })
+            results.append(
+                DetectedBarcode(
+                    data=obj.data.decode("utf-8", errors="replace"),
+                    barcode_type=obj.type,
+                    confidence=1.0 if len(decoded) == 1 else 0.8,
+                    rect=(
+                        {
+                            "x": rect.left,
+                            "y": rect.top,
+                            "w": rect.width,
+                            "h": rect.height,
+                        }
+                        if rect
+                        else None
+                    ),
+                )
+            )
+            logger.info(
+                "Barcode detected in image",
+                extra={
+                    "barcode": results[-1].data,
+                    "type": obj.type,
+                },
+            )
         return results
     except Exception as e:
-        logger.warning("Barcode detection failed on image", extra={
-            "path": image_path,
-            "error": str(e),
-        })
+        logger.warning(
+            "Barcode detection failed on image",
+            extra={
+                "path": image_path,
+                "error": str(e),
+            },
+        )
         return []

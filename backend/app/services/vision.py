@@ -1,4 +1,5 @@
 """Multi-provider vision analysis with structured logging."""
+
 import base64
 import json
 import logging
@@ -42,7 +43,9 @@ class VisionAnalyzer:
         if self.provider in ("hermes", "hermes-gateway"):
             key = os.getenv("HERMES_API_KEY") or os.getenv("OPENAI_API_KEY")
             if not key:
-                raise ValueError("HERMES_API_KEY (or OPENAI_API_KEY) is required for Hermes provider")
+                raise ValueError(
+                    "HERMES_API_KEY (or OPENAI_API_KEY) is required for Hermes provider"
+                )
             return key
         if self.provider == "openai":
             key = os.getenv("OPENAI_API_KEY")
@@ -64,7 +67,9 @@ class VisionAnalyzer:
                 except OSError as e:
                     raise ValueError(f"OPENCLAW_GATEWAY_TOKEN_FILE is unreadable: {e}")
             if not key:
-                raise ValueError("OPENCLAW_GATEWAY_TOKEN or OPENCLAW_GATEWAY_TOKEN_FILE is required for OpenClaw provider")
+                raise ValueError(
+                    "OPENCLAW_GATEWAY_TOKEN or OPENCLAW_GATEWAY_TOKEN_FILE is required for OpenClaw provider"
+                )
             return key
         return ""
 
@@ -76,10 +81,18 @@ class VisionAnalyzer:
         """
         try:
             from openai import OpenAI
+
             base_url = os.getenv("HERMES_VISION_URL") or None
-            self.client = OpenAI(api_key=self.api_key, base_url=base_url) if base_url else OpenAI(api_key=self.api_key)
+            self.client = (
+                OpenAI(api_key=self.api_key, base_url=base_url)
+                if base_url
+                else OpenAI(api_key=self.api_key)
+            )
             self.model = os.getenv("HERMES_MODEL", "gpt-4-vision-preview")
-            logger.info("Hermes vision provider initialized", extra={"model": self.model, "base_url": base_url or "openai"})
+            logger.info(
+                "Hermes vision provider initialized",
+                extra={"model": self.model, "base_url": base_url or "openai"},
+            )
         except ImportError:
             raise ImportError("openai package not installed. Run: pip install openai")
 
@@ -89,14 +102,18 @@ class VisionAnalyzer:
             "http://172.16.1.1:18790/analyze",
         )
         self.model = os.getenv("OPENCLAW_VISION_MODEL", "openai/gpt-5.4-mini")
-        logger.info("OpenClaw vision provider initialized", extra={
-            "model": self.model,
-            "vision_url": self.vision_url,
-        })
+        logger.info(
+            "OpenClaw vision provider initialized",
+            extra={
+                "model": self.model,
+                "vision_url": self.vision_url,
+            },
+        )
 
     def _init_openai(self):
         try:
             from openai import OpenAI
+
             self.client = OpenAI(api_key=self.api_key)
             self.model = os.getenv("OPENAI_MODEL", "gpt-5")
             logger.info("OpenAI client initialized", extra={"model": self.model})
@@ -106,6 +123,7 @@ class VisionAnalyzer:
     def _init_nvidia(self):
         try:
             from openai import OpenAI
+
             self.client = OpenAI(
                 api_key=os.getenv("NVIDIA_NIM_API_KEY"),
                 base_url="https://integrate.api.nvidia.com/v1",
@@ -121,10 +139,13 @@ class VisionAnalyzer:
         logger.info("Mock vision provider initialized (no-op)")
 
     def analyze_image(self, image_path: str) -> VisionOutput:
-        logger.info("Analyzing image", extra={
-            "provider": self.provider,
-            "image_path": image_path,
-        })
+        logger.info(
+            "Analyzing image",
+            extra={
+                "provider": self.provider,
+                "image_path": image_path,
+            },
+        )
         try:
             if self.provider in ("hermes", "hermes-gateway", "openai"):
                 return self._analyze_openai(image_path)
@@ -138,7 +159,11 @@ class VisionAnalyzer:
                 with open(image_path, "rb"):
                     pass
                 logger.info("Mock analysis (no-op)")
-                return VisionOutput(scene_confidence=0.0, items=[], notes="mock provider: no analysis performed")
+                return VisionOutput(
+                    scene_confidence=0.0,
+                    items=[],
+                    notes="mock provider: no analysis performed",
+                )
         except FileNotFoundError:
             logger.error("Image file not found", extra={"path": image_path})
             raise VisionAnalysisError(f"Image file not found: {image_path}")
@@ -151,7 +176,11 @@ class VisionAnalyzer:
             with open(image_path, "rb") as f:
                 image_data = base64.b64encode(f.read()).decode("utf-8")
 
-            payload = {"model": self.model, "image_base64": image_data, "prompt": self._build_prompt()}
+            payload = {
+                "model": self.model,
+                "image_base64": image_data,
+                "prompt": self._build_prompt(),
+            }
             req = urllib.request.Request(
                 self.vision_url,
                 data=json.dumps(payload).encode("utf-8"),
@@ -161,25 +190,35 @@ class VisionAnalyzer:
                 },
                 method="POST",
             )
-            with urllib.request.urlopen(req, timeout=int(os.getenv("OPENCLAW_TIMEOUT", "120"))) as resp:
+            with urllib.request.urlopen(
+                req, timeout=int(os.getenv("OPENCLAW_TIMEOUT", "120"))
+            ) as resp:
                 result = json.loads(resp.read().decode("utf-8"))
 
             response_text = result["text"]
-            logger.info("OpenClaw vision response received", extra={"model": result.get("model")})
+            logger.info(
+                "OpenClaw vision response received",
+                extra={"model": result.get("model")},
+            )
             return self._parse_response(response_text)
         except urllib.error.HTTPError as e:
             body = e.read().decode("utf-8", errors="replace")[:500]
-            logger.error("OpenClaw vision HTTP error", extra={"status": e.code, "body": body})
+            logger.error(
+                "OpenClaw vision HTTP error", extra={"status": e.code, "body": body}
+            )
             raise VisionAnalysisError(f"OpenClaw vision HTTP error {e.code}: {body}")
         except urllib.error.URLError as e:
             logger.error("OpenClaw vision network error", extra={"error": str(e)})
             raise VisionAnalysisError(f"OpenClaw vision network error: {str(e)}")
         except (KeyError, IndexError, json.JSONDecodeError) as e:
-            logger.error("OpenClaw vision response parse error", extra={"error": str(e)})
+            logger.error(
+                "OpenClaw vision response parse error", extra={"error": str(e)}
+            )
             raise VisionAnalysisError(f"OpenClaw vision response parse error: {str(e)}")
 
     def _analyze_openai(self, image_path: str) -> VisionOutput:
         from openai import APIError, APIConnectionError, RateLimitError
+
         try:
             with open(image_path, "rb") as f:
                 image_data = base64.b64encode(f.read()).decode("utf-8")
@@ -190,14 +229,29 @@ class VisionAnalyzer:
                     {
                         "role": "user",
                         "content": [
-                            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_data}", "detail": "high"}},
-                            {"type": "text", "text": self._build_prompt()}
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/jpeg;base64,{image_data}",
+                                    "detail": "high",
+                                },
+                            },
+                            {"type": "text", "text": self._build_prompt()},
                         ],
                     }
                 ],
             )
             response_text = response.choices[0].message.content
-            logger.info("OpenAI response received", extra={"tokens": response.usage.total_tokens if hasattr(response, 'usage') and response.usage else None})
+            logger.info(
+                "OpenAI response received",
+                extra={
+                    "tokens": (
+                        response.usage.total_tokens
+                        if hasattr(response, "usage") and response.usage
+                        else None
+                    )
+                },
+            )
             return self._parse_response(response_text)
         except (APIConnectionError, ConnectionError) as e:
             logger.error("OpenAI network error", extra={"error": str(e)})
@@ -206,11 +260,18 @@ class VisionAnalyzer:
             logger.warning("OpenAI rate limit hit")
             raise VisionAnalysisError("Rate limit exceeded. Please try again later.")
         except APIError as e:
-            logger.error("OpenAI API error", extra={"error": str(e), "status": e.status_code if hasattr(e, 'status_code') else None})
+            logger.error(
+                "OpenAI API error",
+                extra={
+                    "error": str(e),
+                    "status": e.status_code if hasattr(e, "status_code") else None,
+                },
+            )
             raise VisionAnalysisError(f"OpenAI API error: {str(e)}")
 
     def _analyze_nvidia(self, image_path: str) -> VisionOutput:
         from openai import APIError, APIConnectionError, RateLimitError
+
         try:
             with open(image_path, "rb") as f:
                 image_data = base64.b64encode(f.read()).decode("utf-8")
@@ -222,8 +283,14 @@ class VisionAnalyzer:
                     {
                         "role": "user",
                         "content": [
-                            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_data}", "detail": "high"}},
-                            {"type": "text", "text": self._build_prompt()}
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/jpeg;base64,{image_data}",
+                                    "detail": "high",
+                                },
+                            },
+                            {"type": "text", "text": self._build_prompt()},
                         ],
                     }
                 ],
@@ -243,24 +310,34 @@ class VisionAnalyzer:
 
     def _init_ollama(self):
         import requests
+
         self.ollama_host = os.getenv("OLLAMA_HOST", "http://localhost:11434")
         self.model = os.getenv("OLLAMA_MODEL", "llava:latest")
         try:
             response = requests.get(f"{self.ollama_host}/api/tags", timeout=5)
             response.raise_for_status()
-            logger.info("Ollama connected", extra={"model": self.model, "host": self.ollama_host})
+            logger.info(
+                "Ollama connected",
+                extra={"model": self.model, "host": self.ollama_host},
+            )
         except Exception as e:
             logger.warning("Ollama connection test failed", extra={"error": str(e)})
 
     def _analyze_ollama(self, image_path: str) -> VisionOutput:
         import requests
+
         try:
             with open(image_path, "rb") as f:
                 image_base64 = base64.b64encode(f.read()).decode("utf-8")
             prompt = self._build_prompt()
             response = requests.post(
                 f"{self.ollama_host}/api/generate",
-                json={"model": self.model, "prompt": prompt, "images": [image_base64], "stream": False},
+                json={
+                    "model": self.model,
+                    "prompt": prompt,
+                    "images": [image_base64],
+                    "stream": False,
+                },
                 timeout=120,
             )
             response.raise_for_status()
@@ -288,7 +365,10 @@ class VisionAnalyzer:
             logger.info("Parsed vision result", extra={"items": len(result.items)})
             return result
         except json.JSONDecodeError:
-            logger.warning("JSON parse failed, fallback to text extraction", extra={"response_preview": response_text[:800]})
+            logger.warning(
+                "JSON parse failed, fallback to text extraction",
+                extra={"response_preview": response_text[:800]},
+            )
             return self._extract_items_from_text(response_text)
         except ValueError as e:
             logger.error("Invalid response structure", extra={"error": str(e)})
@@ -296,6 +376,7 @@ class VisionAnalyzer:
 
     def _extract_items_from_text(self, text: str) -> VisionOutput:
         import re
+
         items = []
         # Try to find items from a malformed JSON-like response
         json_items = re.findall(r'"name"\s*:\s*"([^"]+)"', text)
@@ -303,21 +384,61 @@ class VisionAnalyzer:
             for name in json_items:
                 n = name.strip()
                 if n and len(n) > 2 and len(n.split()) <= 5:
-                    items.append({"name": n, "brand": None, "package_type": "other", "quantity_estimate": None, "confidence": 0.5})
-        patterns = [r'(?:^|\n)[-*]\s*([A-Za-z][^:\n]{2,60})', r'(?:^|\n)\d+\.{0,1}\s*([A-Za-z][^:\n]{2,60})']
+                    items.append(
+                        {
+                            "name": n,
+                            "brand": None,
+                            "package_type": "other",
+                            "quantity_estimate": None,
+                            "confidence": 0.5,
+                        }
+                    )
+        patterns = [
+            r"(?:^|\n)[-*]\s*([A-Za-z][^:\n]{2,60})",
+            r"(?:^|\n)\d+\.{0,1}\s*([A-Za-z][^:\n]{2,60})",
+        ]
         for pattern in patterns:
             matches = re.findall(pattern, text, re.IGNORECASE)
             for match in matches:
                 name = match.strip()
                 if name and len(name) > 2 and len(name.split()) <= 5:
                     lower = name.lower()
-                    skip_words = ['with', 'and', 'are', 'the', 'this', 'that', 'from', 'various']
+                    skip_words = [
+                        "with",
+                        "and",
+                        "are",
+                        "the",
+                        "this",
+                        "that",
+                        "from",
+                        "various",
+                    ]
                     word_count = len(name.split())
                     skip_count = sum(1 for w in skip_words if w in lower)
                     if word_count > 3 and skip_count >= max(1, word_count // 2):
                         continue
-                    if lower not in ('cans', 'boxes', 'jars', 'items', 'assortment', 'display', 'selection', 'variety', 'arrangement', 'section', 'produce'):
-                        items.append({"name": name, "brand": None, "package_type": "other", "quantity_estimate": None, "confidence": 0.5})
+                    if lower not in (
+                        "cans",
+                        "boxes",
+                        "jars",
+                        "items",
+                        "assortment",
+                        "display",
+                        "selection",
+                        "variety",
+                        "arrangement",
+                        "section",
+                        "produce",
+                    ):
+                        items.append(
+                            {
+                                "name": name,
+                                "brand": None,
+                                "package_type": "other",
+                                "quantity_estimate": None,
+                                "confidence": 0.5,
+                            }
+                        )
         seen = set()
         unique_items = []
         for item in items:
@@ -328,7 +449,7 @@ class VisionAnalyzer:
         return VisionOutput(
             scene_confidence=0.5 if unique_items else 0.3,
             items=unique_items,
-            notes=f"Text-only response. Full response: {text[:200]}..."
+            notes=f"Text-only response. Full response: {text[:200]}...",
         )
 
     def _build_prompt(self) -> str:

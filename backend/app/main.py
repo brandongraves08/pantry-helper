@@ -11,7 +11,21 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from app.api.routes import ingest, inventory, admin, devices, advanced_inventory, agent
-from app.api.routes import shopping, reviews, captures, zones, household, barcode, detections, nutrition, recipes, meal_plans, inventory_verify, flags
+from app.api.routes import (
+    shopping,
+    reviews,
+    captures,
+    zones,
+    household,
+    barcode,
+    detections,
+    nutrition,
+    recipes,
+    meal_plans,
+    inventory_verify,
+    flags,
+    gear,
+)
 from app.config import settings
 from app.db.database import engine, Base
 from app.exceptions import PantryException
@@ -25,24 +39,29 @@ Base.metadata.create_all(bind=engine)
 app = FastAPI(
     title="Pantry Inventory API",
     version="1.0.0",
-    description="Event-driven pantry inventory system with ESP32 camera integration"
+    description="Event-driven pantry inventory system with ESP32 camera integration",
 )
+
 
 # Exception handler for PantryException
 @app.exception_handler(PantryException)
 async def pantry_exception_handler(request, exc: PantryException):
-    logger.error("PantryException", extra={
-        "status_code": exc.status_code,
-        "detail": exc.message,
-    })
+    logger.error(
+        "PantryException",
+        extra={
+            "status_code": exc.status_code,
+            "detail": exc.message,
+        },
+    )
     return JSONResponse(
         status_code=exc.status_code,
         content={
             "detail": exc.message,
             "status_code": exc.status_code,
-            **({"details": exc.details} if exc.details else {})
+            **({"details": exc.details} if exc.details else {}),
         },
     )
+
 
 # Request logging middleware (outermost — captures all requests including rate-limited ones)
 app.add_middleware(RequestLogMiddleware)
@@ -81,6 +100,8 @@ app.include_router(recipes.router, prefix="/v1", tags=["recipes"])
 app.include_router(meal_plans.router, prefix="/v1", tags=["meal_plans"])
 app.include_router(inventory_verify.router, prefix="/v1", tags=["inventory_verify"])
 app.include_router(flags.router, prefix="/v1", tags=["flags"])
+app.include_router(gear.router, prefix="/v1", tags=["gear"])
+
 
 @app.get("/health")
 async def health_check():
@@ -152,12 +173,16 @@ async def health_check():
 
     return health
 
+
 @app.on_event("startup")
 async def startup_event():
-    logger.info("Pantry API started", extra={
-        "version": "1.0.0",
-        "providers": {
-            "vision": os.getenv("VISION_PROVIDER", "not set"),
-            "db": os.getenv("DATABASE_URL", "not set")[:30] + "...",
-        }
-    })
+    logger.info(
+        "Pantry API started",
+        extra={
+            "version": "1.0.0",
+            "providers": {
+                "vision": os.getenv("VISION_PROVIDER", "not set"),
+                "db": os.getenv("DATABASE_URL", "not set")[:30] + "...",
+            },
+        },
+    )

@@ -15,7 +15,7 @@ class TestE2EImageProcessing:
     def create_test_image(width: int = 800, height: int = 600) -> bytes:
         """
         Create a test image (pantry shelf with items).
-        
+
         Returns:
             bytes: JPEG image data
         """

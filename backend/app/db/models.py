@@ -1,8 +1,20 @@
-from sqlalchemy import Column, String, DateTime, Date, Float, Integer, Boolean, Text, ForeignKey, JSON
+from sqlalchemy import (
+    Column,
+    String,
+    DateTime,
+    Date,
+    Float,
+    Integer,
+    Boolean,
+    Text,
+    ForeignKey,
+    JSON,
+)
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import uuid
 from app.db.database import Base
+
 
 class Device(Base):
     __tablename__ = "devices"
@@ -18,6 +30,7 @@ class Device(Base):
     captures = relationship("Capture", back_populates="device")
     zones = relationship("Zone", back_populates="device")
 
+
 class Capture(Base):
     __tablename__ = "captures"
 
@@ -28,12 +41,15 @@ class Capture(Base):
     image_path = Column(String, nullable=False)
     battery_v = Column(Float, nullable=True)
     rssi = Column(Integer, nullable=True)
-    status = Column(String, nullable=False, default="stored", index=True)  # stored, analyzing, complete, failed
+    status = Column(
+        String, nullable=False, default="stored", index=True
+    )  # stored, analyzing, complete, failed
     error_message = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     device = relationship("Device", back_populates="captures")
     observations = relationship("Observation", back_populates="capture")
+
 
 class Observation(Base):
     __tablename__ = "observations"
@@ -46,6 +62,7 @@ class Observation(Base):
 
     capture = relationship("Capture", back_populates="observations")
     zone_detections = relationship("ZoneDetection", back_populates="observation")
+
 
 class Location(Base):
     __tablename__ = "locations"
@@ -75,18 +92,40 @@ class InventoryItem(Base):
     heb_url = Column(String, nullable=True)
     heb_price = Column(Float, nullable=True)
     heb_image_url = Column(String, nullable=True)
-    heb_status = Column(String, nullable=False, default="pending")  # pending | done | failed
+    heb_status = Column(
+        String, nullable=False, default="pending"
+    )  # pending | done | failed
     heb_lookup_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     states = relationship("InventoryState", back_populates="item")
     events = relationship("InventoryEvent", back_populates="item")
 
+
+class PreppingGear(Base):
+    __tablename__ = "prepping_gear"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String, nullable=False)
+    category = Column(String, nullable=False)
+    quantity = Column(Float, nullable=False, default=1)
+    unit = Column(String, nullable=True)
+    location = Column(String, nullable=True)
+    condition = Column(String, nullable=False, default="Unknown")
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
 class InventoryState(Base):
     __tablename__ = "inventory_state"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    item_id = Column(String, ForeignKey("inventory_items.id"), nullable=False, index=True)
+    item_id = Column(
+        String, ForeignKey("inventory_items.id"), nullable=False, index=True
+    )
     location_id = Column(String, ForeignKey("locations.id"), nullable=True, index=True)
 
     count_estimate = Column(Integer, nullable=False, default=0)
@@ -100,10 +139,13 @@ class InventoryState(Base):
 
     is_manual = Column(Boolean, nullable=False, default=False)
     notes = Column(String, nullable=True)
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
     item = relationship("InventoryItem", back_populates="states")
     location = relationship("Location")
+
 
 class InventoryFlag(Base):
     """User-reported issue on an inventory item (wrong image/brand/count/name...).
@@ -116,10 +158,14 @@ class InventoryFlag(Base):
     __tablename__ = "inventory_flags"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    item_id = Column(String, ForeignKey("inventory_items.id"), nullable=False, index=True)
+    item_id = Column(
+        String, ForeignKey("inventory_items.id"), nullable=False, index=True
+    )
     field = Column(String, nullable=True)  # image | brand | count | name | other
     reason = Column(Text, nullable=False)
-    status = Column(String, nullable=False, default="open", index=True)  # open | resolved
+    status = Column(
+        String, nullable=False, default="open", index=True
+    )  # open | resolved
     resolution_note = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     resolved_at = Column(DateTime(timezone=True), nullable=True)
@@ -131,7 +177,9 @@ class InventoryEvent(Base):
     __tablename__ = "inventory_events"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    item_id = Column(String, ForeignKey("inventory_items.id"), nullable=False, index=True)
+    item_id = Column(
+        String, ForeignKey("inventory_items.id"), nullable=False, index=True
+    )
     capture_id = Column(String, ForeignKey("captures.id"), nullable=True, index=True)
     event_type = Column(String, nullable=False)  # seen, adjusted, manual_override
     delta = Column(Integer, nullable=False, default=0)
@@ -146,7 +194,9 @@ class ShoppingListItem(Base):
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     item_id = Column(String, ForeignKey("inventory_items.id"), nullable=True)
-    item_name = Column(String, nullable=True)  # free-text fallback for untracked/meal-plan items
+    item_name = Column(
+        String, nullable=True
+    )  # free-text fallback for untracked/meal-plan items
     location_id = Column(String, ForeignKey("locations.id"), nullable=True)
     needed = Column(Integer, nullable=False, default=0)
     reason = Column(String, nullable=True)
@@ -162,15 +212,19 @@ class InventoryReview(Base):
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     capture_id = Column(String, ForeignKey("captures.id"), nullable=False)
-    status = Column(String, nullable=False, default="pending")  # pending/approved/rejected
+    status = Column(
+        String, nullable=False, default="pending"
+    )  # pending/approved/rejected
     notes = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     resolved_at = Column(DateTime(timezone=True), nullable=True)
 
     capture = relationship("Capture")
 
+
 class Zone(Base):
     """Spatial zones on shelves for ML learning"""
+
     __tablename__ = "zones"
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     device_id = Column(String, ForeignKey("devices.id"), nullable=False)
@@ -183,11 +237,15 @@ class Zone(Base):
     notes = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
     device = relationship("Device", back_populates="zones")
+
 
 class ZonePattern(Base):
     """Learned patterns per zone"""
+
     __tablename__ = "zone_patterns"
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     zone_id = Column(String, ForeignKey("zones.id"), nullable=False)
@@ -196,10 +254,14 @@ class ZonePattern(Base):
     avg_quantity = Column(Float, nullable=True)
     confidence_score = Column(Float, default=0.0)
     last_seen_at = Column(DateTime(timezone=True), nullable=True)
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
 
 class ZoneDetection(Base):
     """Detections linked to specific zones"""
+
     __tablename__ = "zone_detections"
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     observation_id = Column(String, ForeignKey("observations.id"), nullable=False)
@@ -220,8 +282,10 @@ class ZoneDetection(Base):
     zone = relationship("Zone")
     inferred_item = relationship("InventoryItem")
 
+
 class HouseholdMember(Base):
     """Household member profiles for nutrition/allergen tracking"""
+
     __tablename__ = "household_members"
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     name = Column(String, nullable=False)
@@ -230,29 +294,37 @@ class HouseholdMember(Base):
     avatar_url = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
     restrictions = relationship("DietaryRestriction", back_populates="member")
-    nutrition_target = relationship("NutritionTarget", back_populates="member", uselist=False)
+    nutrition_target = relationship(
+        "NutritionTarget", back_populates="member", uselist=False
+    )
     consumption_events = relationship("ConsumptionEvent", back_populates="member")
 
 
 class DietaryRestriction(Base):
     """Allergies, intolerances, preferences per member"""
+
     __tablename__ = "dietary_restrictions"
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     member_id = Column(String, ForeignKey("household_members.id"), nullable=False)
-    restriction_type = Column(String, nullable=False)  # allergy, intolerance, preference, medical
+    restriction_type = Column(
+        String, nullable=False
+    )  # allergy, intolerance, preference, medical
     allergen = Column(String, nullable=True)  # peanuts, dairy, gluten, etc
     severity = Column(String, nullable=True)  # mild, moderate, severe, life_threatening
     notes = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    
+
     member = relationship("HouseholdMember", back_populates="restrictions")
 
 
 class NutritionTarget(Base):
     """Daily nutrition targets per member"""
+
     __tablename__ = "nutrition_targets"
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     member_id = Column(String, ForeignKey("household_members.id"), nullable=False)
@@ -262,13 +334,16 @@ class NutritionTarget(Base):
     daily_fat_g = Column(Float, nullable=True)
     daily_fiber_g = Column(Float, nullable=True)
     notes = Column(String, nullable=True)
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
     member = relationship("HouseholdMember", back_populates="nutrition_target")
 
 
 class NutritionFact(Base):
     """Nutrition facts per inventory item"""
+
     __tablename__ = "nutrition_facts"
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     inventory_item_id = Column(String, ForeignKey("inventory_items.id"), nullable=False)
@@ -282,25 +357,33 @@ class NutritionFact(Base):
     sodium_mg = Column(Float, nullable=True)
     sugar_g = Column(Float, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    
-    item = relationship("InventoryItem", back_populates="nutrition_facts", uselist=False)
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    item = relationship(
+        "InventoryItem", back_populates="nutrition_facts", uselist=False
+    )
 
 
 class ItemAllergen(Base):
     """Allergens present in inventory items (Big 9 + custom)"""
+
     __tablename__ = "item_allergens"
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     inventory_item_id = Column(String, ForeignKey("inventory_items.id"), nullable=False)
-    allergen = Column(String, nullable=False)  # peanuts, tree_nuts, milk, eggs, fish, shellfish, wheat, soy, sesame
+    allergen = Column(
+        String, nullable=False
+    )  # peanuts, tree_nuts, milk, eggs, fish, shellfish, wheat, soy, sesame
     is_present = Column(Boolean, default=True)  # True=contains, False=may_contain
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    
+
     item = relationship("InventoryItem", back_populates="allergens")
 
 
 class ConsumptionEvent(Base):
     """Track what household members consume (for supply forecasting)"""
+
     __tablename__ = "consumption_events"
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     member_id = Column(String, ForeignKey("household_members.id"), nullable=False)
@@ -309,19 +392,24 @@ class ConsumptionEvent(Base):
     consumed_at = Column(DateTime(timezone=True), nullable=False)
     captured_at = Column(DateTime(timezone=True), server_default=func.now())
     notes = Column(String, nullable=True)  # e.g., "breakfast"
-    
+
     member = relationship("HouseholdMember", back_populates="consumption_events")
     item = relationship("InventoryItem", back_populates="consumption_events")
 
 
 # Add relationship to InventoryItem
-InventoryItem.nutrition_facts = relationship("NutritionFact", back_populates="item", uselist=False)
+InventoryItem.nutrition_facts = relationship(
+    "NutritionFact", back_populates="item", uselist=False
+)
 InventoryItem.allergens = relationship("ItemAllergen", back_populates="item")
-InventoryItem.consumption_events = relationship("ConsumptionEvent", back_populates="item")
+InventoryItem.consumption_events = relationship(
+    "ConsumptionEvent", back_populates="item"
+)
 
 
 class BarcodeLookup(Base):
     """Barcode-to-inventory-item mapping cache."""
+
     __tablename__ = "barcode_lookups"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -339,7 +427,9 @@ class BarcodeLookup(Base):
     ingredients_text = Column(Text, nullable=True)
     source = Column(String, nullable=True)  # openfoodfacts, manual
     lookup_count = Column(Integer, nullable=False, default=1)
-    last_lookup_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    last_lookup_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     inventory_item = relationship("InventoryItem", backref="barcodes")
@@ -347,6 +437,7 @@ class BarcodeLookup(Base):
 
 class Recipe(Base):
     """A saved recipe with ingredients and instructions."""
+
     __tablename__ = "recipes"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -360,7 +451,9 @@ class Recipe(Base):
     rating = Column(Float, nullable=True)  # 1-5, user rating
     is_favorite = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
     ingredients = relationship(
         "RecipeIngredient",
@@ -372,6 +465,7 @@ class Recipe(Base):
 
 class RecipeIngredient(Base):
     """An ingredient line in a recipe, optionally linked to an inventory item."""
+
     __tablename__ = "recipe_ingredients"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -396,7 +490,9 @@ class MealPlan(Base):
     week_start = Column(Date, nullable=False, index=True)  # Monday of the plan week
     name = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
     entries = relationship(
         "MealPlanEntry",
@@ -412,11 +508,15 @@ class MealPlanEntry(Base):
     __tablename__ = "meal_plan_entries"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    meal_plan_id = Column(String, ForeignKey("meal_plans.id"), nullable=False, index=True)
+    meal_plan_id = Column(
+        String, ForeignKey("meal_plans.id"), nullable=False, index=True
+    )
     plan_date = Column(Date, nullable=False, index=True)
     meal_type = Column(String, nullable=False)  # breakfast | lunch | dinner | snack
     recipe_id = Column(String, ForeignKey("recipes.id"), nullable=False)
-    servings_multiplier = Column(Integer, nullable=False, default=1)  # 1x recipe = recipe servings
+    servings_multiplier = Column(
+        Integer, nullable=False, default=1
+    )  # 1x recipe = recipe servings
     notes = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

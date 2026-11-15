@@ -7,6 +7,7 @@ a tighter limit on ingest/admin processing endpoints.
 Uses Redis (INCR + EXPIRE, fixed-window) when available; falls back to an
 in-process dict store so the stack still functions if Redis is down.
 """
+
 import logging
 import time
 import hashlib
@@ -49,6 +50,7 @@ class RateLimitStore:
         self._redis_attempted = True
         try:
             import redis
+
             self._redis = redis.from_url(
                 settings.REDIS_URL,
                 socket_connect_timeout=2,
@@ -57,7 +59,10 @@ class RateLimitStore:
             )
             self._redis.ping()
         except Exception as e:
-            logger.warning("Redis rate-limit store unavailable, using in-memory fallback", extra={"error": str(e)})
+            logger.warning(
+                "Redis rate-limit store unavailable, using in-memory fallback",
+                extra={"error": str(e)},
+            )
             self._redis = None
         return self._redis
 
@@ -72,7 +77,10 @@ class RateLimitStore:
                     r.expire(full_key, period)
                 return count, count <= limit
             except Exception as e:
-                logger.warning("Redis rate-limit incr failed, falling back", extra={"error": str(e)})
+                logger.warning(
+                    "Redis rate-limit incr failed, falling back",
+                    extra={"error": str(e)},
+                )
         # in-memory fallback (fixed window)
         now = time.time()
         rec = self._mem.get(key)
@@ -117,10 +125,22 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         retry_after = period
 
         if not allowed:
-            logger.warning("Rate limit exceeded", extra={"identifier": identifier, "path": path, "count": count, "limit": limit})
+            logger.warning(
+                "Rate limit exceeded",
+                extra={
+                    "identifier": identifier,
+                    "path": path,
+                    "count": count,
+                    "limit": limit,
+                },
+            )
             return JSONResponse(
                 status_code=429,
-                content={"detail": "Rate limit exceeded", "remaining": remaining, "retry_after": period},
+                content={
+                    "detail": "Rate limit exceeded",
+                    "remaining": remaining,
+                    "retry_after": period,
+                },
                 headers={
                     "Retry-After": str(retry_after),
                     "X-RateLimit-Limit": str(limit),

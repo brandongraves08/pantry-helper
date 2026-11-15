@@ -1,4 +1,5 @@
 """Capture processing pipeline with structured logging."""
+
 import json
 import logging
 import os
@@ -19,14 +20,23 @@ class CaptureProcessor:
             self.vision = VisionAnalyzer()
         except ValueError as e:
             if os.getenv("PYTEST_CURRENT_TEST"):
-                logger.warning("Vision analyzer unavailable in test context", extra={"error": str(e)})
+                logger.warning(
+                    "Vision analyzer unavailable in test context",
+                    extra={"error": str(e)},
+                )
                 self.vision = VisionAnalyzer(provider="mock")
             else:
                 raise
 
     def process_capture(self, capture_id: str) -> bool:
         from app.db.session import SessionLocal
-        from app.db.models import Capture, Observation, InventoryItem, InventoryState, InventoryEvent
+        from app.db.models import (
+            Capture,
+            Observation,
+            InventoryItem,
+            InventoryState,
+            InventoryEvent,
+        )
 
         logger.info("Starting capture processing", extra={"capture_id": capture_id})
 
@@ -43,14 +53,18 @@ class CaptureProcessor:
             image_path = capture.image_path
             if not os.path.isabs(image_path):
                 from app.services.storage import get_storage_manager
+
                 mgr = get_storage_manager()
                 image_path = str(mgr.storage_path / image_path)
 
             if not os.path.exists(image_path):
-                logger.error("Image file not found", extra={
-                    "capture_id": capture_id,
-                    "image_path": image_path,
-                })
+                logger.error(
+                    "Image file not found",
+                    extra={
+                        "capture_id": capture_id,
+                        "image_path": image_path,
+                    },
+                )
                 capture.status = "failed"
                 capture.error_message = f"Image file not found: {image_path}"
                 db.commit()
@@ -59,25 +73,34 @@ class CaptureProcessor:
             # Run barcode detection on the image
             barcodes = detect_barcodes(image_path)
             if barcodes:
-                logger.info("Barcode(s) detected in capture image", extra={
-                    "capture_id": capture_id,
-                    "count": len(barcodes),
-                    "codes": [b.data for b in barcodes],
-                })
+                logger.info(
+                    "Barcode(s) detected in capture image",
+                    extra={
+                        "capture_id": capture_id,
+                        "count": len(barcodes),
+                        "codes": [b.data for b in barcodes],
+                    },
+                )
                 # Look up each detected barcode and create/update barcode lookup records
                 for bc in barcodes:
                     try:
                         product = lookup_barcode(bc.data)
                         if product.found:
-                            logger.info("Barcode resolved to product", extra={
-                                "barcode": bc.data,
-                                "product": product.product_name,
-                            })
+                            logger.info(
+                                "Barcode resolved to product",
+                                extra={
+                                    "barcode": bc.data,
+                                    "product": product.product_name,
+                                },
+                            )
                             # Check if item already in inventory
                             from app.db.models import BarcodeLookup
-                            existing = db.query(BarcodeLookup).filter(
-                                BarcodeLookup.barcode == bc.data
-                            ).first()
+
+                            existing = (
+                                db.query(BarcodeLookup)
+                                .filter(BarcodeLookup.barcode == bc.data)
+                                .first()
+                            )
                             if not existing:
                                 bl = BarcodeLookup(
                                     barcode=bc.data,
@@ -91,17 +114,23 @@ class CaptureProcessor:
                                 db.add(bl)
                                 db.commit()
                     except Exception as bc_err:
-                        logger.warning("Barcode product lookup failed", extra={
-                            "barcode": bc.data,
-                            "error": str(bc_err),
-                        })
+                        logger.warning(
+                            "Barcode product lookup failed",
+                            extra={
+                                "barcode": bc.data,
+                                "error": str(bc_err),
+                            },
+                        )
 
             # Run vision analysis
-            logger.info("Running vision analysis", extra={
-                "capture_id": capture_id,
-                "provider": self.vision.provider,
-                "image_path": image_path,
-            })
+            logger.info(
+                "Running vision analysis",
+                extra={
+                    "capture_id": capture_id,
+                    "provider": self.vision.provider,
+                    "image_path": image_path,
+                },
+            )
             result: VisionOutput = self.vision.analyze_image(image_path)
 
             # Store observation
@@ -122,17 +151,22 @@ class CaptureProcessor:
                 qty = item_data.quantity_estimate or 1
                 conf = item_data.confidence or 0.5
                 if conf < 0.7:
-                    logger.info("Skipping low-confidence item", extra={
-                        "capture_id": capture_id,
-                        "item": name,
-                        "confidence": conf,
-                    })
+                    logger.info(
+                        "Skipping low-confidence item",
+                        extra={
+                            "capture_id": capture_id,
+                            "item": name,
+                            "confidence": conf,
+                        },
+                    )
                     continue
 
                 canonical = name.lower().replace("  ", " ").strip()
-                inv_item = db.query(InventoryItem).filter(
-                    InventoryItem.canonical_name == canonical
-                ).first()
+                inv_item = (
+                    db.query(InventoryItem)
+                    .filter(InventoryItem.canonical_name == canonical)
+                    .first()
+                )
 
                 if not inv_item:
                     inv_item = InventoryItem(
@@ -147,9 +181,12 @@ class CaptureProcessor:
                 # Always update to the latest capture so the photo stays fresh
                 inv_item.image_path = capture.image_path
 
-                state = db.query(InventoryState).filter(
-                    InventoryState.item_id == inv_item.id
-                ).first()
+                state = (
+                    db.query(InventoryState)
+                    .filter(InventoryState.item_id == inv_item.id)
+                    .first()
+                )
+                state_created_by_capture = state is None
 
                 if state:
                     delta = qty - (state.count_estimate or 0)
@@ -174,6 +211,7 @@ class CaptureProcessor:
                     details={
                         "confidence": conf,
                         "trigger_type": capture.trigger_type,
+                        "state_created_by_capture": state_created_by_capture,
                     },
                 )
                 db.add(event)
@@ -187,35 +225,48 @@ class CaptureProcessor:
             if items_updated > 0:
                 try:
                     from app.workers.notify import notify_shopping_list
+
                     notify_shopping_list.delay()
                 except Exception as notify_err:
-                    logger.warning("Failed to queue shopping-list notification", extra={
-                        "error": str(notify_err),
-                    })
+                    logger.warning(
+                        "Failed to queue shopping-list notification",
+                        extra={
+                            "error": str(notify_err),
+                        },
+                    )
 
-            logger.info("Capture processed", extra={
-                "capture_id": capture_id,
-                "items_found": len(result.items),
-                "items_updated": items_updated,
-                "scene_confidence": result.scene_confidence,
-            })
+            logger.info(
+                "Capture processed",
+                extra={
+                    "capture_id": capture_id,
+                    "items_found": len(result.items),
+                    "items_updated": items_updated,
+                    "scene_confidence": result.scene_confidence,
+                },
+            )
             return True
 
         except VisionAnalysisError as e:
-            logger.error("Vision analysis failed", extra={
-                "capture_id": capture_id,
-                "error": str(e),
-            })
+            logger.error(
+                "Vision analysis failed",
+                extra={
+                    "capture_id": capture_id,
+                    "error": str(e),
+                },
+            )
             capture.status = "failed"
             capture.error_message = f"Vision analysis error: {e}"
             db.commit()
             return False
 
         except Exception as e:
-            logger.exception("Unexpected processing error", extra={
-                "capture_id": capture_id,
-                "error": str(e),
-            })
+            logger.exception(
+                "Unexpected processing error",
+                extra={
+                    "capture_id": capture_id,
+                    "error": str(e),
+                },
+            )
             try:
                 capture.status = "failed"
                 capture.error_message = str(e)
