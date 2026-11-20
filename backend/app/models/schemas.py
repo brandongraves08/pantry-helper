@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List
 from datetime import datetime, date
 
@@ -229,6 +229,32 @@ class BarcodeLookupResult(BaseModel):
     already_in_inventory: bool = False
     existing_item_name: Optional[str] = None
     source: str = "openfoodfacts"
+    label_created_at: Optional[datetime] = None
+
+
+class BarcodeLabelCreateRequest(BaseModel):
+    """Create a local barcode label and add packed items to pantry inventory."""
+    product_name: str
+    package_description: Optional[str] = None
+    quantity_estimate: int = Field(default=1, ge=1)
+
+    @field_validator("product_name")
+    @classmethod
+    def strip_and_require_product_name(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Product name cannot be blank")
+        return value
+
+
+class BarcodeLabelCreateResponse(BaseModel):
+    """The local barcode and item details printed on a pantry label."""
+    barcode: str
+    item_id: str
+    item_name: str
+    package_description: Optional[str] = None
+    quantity_estimate: int
+    label_created_at: datetime
 
 
 class BarcodeLinkRequest(BaseModel):

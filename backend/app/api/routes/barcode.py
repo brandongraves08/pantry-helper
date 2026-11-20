@@ -5,9 +5,11 @@ link barcodes to inventory items, and add scanned items to inventory.
 """
 
 import logging
-from datetime import datetime
+import uuid
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
@@ -18,12 +20,92 @@ from app.models.schemas import (
     BarcodeLinkRequest,
     BarcodeLinkResponse,
     BarcodeAddToInventoryRequest,
+    BarcodeLabelCreateRequest,
+    BarcodeLabelCreateResponse,
 )
 from app.services.barcode import lookup_barcode
 
 logger = logging.getLogger("pantry-api.barcode")
 
 router = APIRouter()
+
+
+def _generate_internal_barcode() -> str:
+    """Generate a non-retail Pantry Helper identifier for Code 128 labels."""
+    return f"PH-{uuid.uuid4().hex}"
+
+
+@router.post("/barcode/create-label", response_model=BarcodeLabelCreateResponse)
+async def create_barcode_label(
+    request: BarcodeLabelCreateRequest,
+    db: Session = Depends(get_db),
+):
+    """Create a local Code 128 label and add its packages to inventory."""
+    now = datetime.now(timezone.utc)
+    barcode = _generate_internal_barcode()
+
+    try:
+        item = db.query(InventoryItem).filter(
+            InventoryItem.canonical_name == request.product_name
+        ).first()
+        if not item:
+            item = InventoryItem(canonical_name=request.product_name, heb_status="pending")
+            db.add(item)
+            db.flush()
+
+        state = db.query(InventoryState).filter(
+            InventoryState.item_id == item.id
+        ).first()
+        if state:
+            state.count_estimate = (state.count_estimate or 0) + request.quantity_estimate
+            state.confidence = 1.0
+            state.is_manual = True
+            state.last_seen_at = now
+        else:
+            state = InventoryState(
+                item_id=item.id,
+                count_estimate=request.quantity_estimate,
+                confidence=1.0,
+                is_manual=True,
+                last_seen_at=now,
+            )
+            db.add(state)
+
+        db.add(InventoryEvent(
+            item_id=item.id,
+            event_type="manual_override",
+            delta=request.quantity_estimate,
+            details={"source": "barcode_label", "barcode": barcode},
+        ))
+        db.add(BarcodeLookup(
+            barcode=barcode,
+            inventory_item_id=item.id,
+            product_name=item.canonical_name,
+            brand=item.brand,
+            category=item.category,
+            package_type=item.package_type,
+            quantity_label=request.package_description,
+            source="manual",
+            created_at=now,
+        ))
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        logger.warning("Unable to save generated pantry barcode", extra={"barcode": barcode})
+        raise HTTPException(status_code=409, detail="Could not create a unique pantry label. Please try again.") from exc
+    except Exception as exc:
+        db.rollback()
+        logger.exception("Unable to create pantry barcode label")
+        raise HTTPException(status_code=500, detail="Could not save pantry label") from exc
+
+    return BarcodeLabelCreateResponse(
+        barcode=barcode,
+        item_id=item.id,
+        item_name=item.canonical_name,
+        package_description=request.package_description,
+        quantity_estimate=request.quantity_estimate,
+        label_created_at=now,
+    )
 
 
 @router.get("/barcode/{barcode}", response_model=BarcodeLookupResult)
@@ -69,6 +151,7 @@ async def scan_barcode(barcode: str, db: Session = Depends(get_db)):
                 cached.inventory_item.canonical_name if cached.inventory_item else None
             ),
             source=cached.source or "cache",
+            label_created_at=cached.created_at if cached.source == "manual" else None,
         )
 
     # External lookup

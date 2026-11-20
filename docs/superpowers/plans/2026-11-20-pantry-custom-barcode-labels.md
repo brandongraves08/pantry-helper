@@ -52,11 +52,11 @@
 - `BarcodeLookupResult.label_created_at: Optional[datetime] = None`; return it only for locally generated entries.
 - `POST /v1/barcode/create-label` accepts the request and returns the response.
 
-- [ ] Write `backend/tests/test_barcode_labels.py` tests for: new item saves count and mapping; existing item count increments; empty name/count 0 are rejected without creating rows; generated identifiers match `^PH-[0-9a-f]{32}$` and collisions do not overwrite; a later `GET /v1/barcode/{barcode}` is served from local cache without external lookup or stock change.
-- [ ] Run `cd backend && pytest -q tests/test_barcode_labels.py`; confirm expected failures because the request/route are not implemented.
+- [ ] Write `backend/tests/test_barcode_labels.py` tests for: new item saves count and mapping; existing item count increments; empty/whitespace names and count 0 are rejected without creating rows; generated identifiers match `^PH-[0-9a-f]{32}$` and collisions do not overwrite; the write route requires Bearer auth; a later `GET /v1/barcode/{barcode}` is served from local cache without external lookup or stock change.
+- [ ] Run `cd backend && .venv312/bin/pytest -q tests/test_barcode_labels.py`; confirm expected failures because the request/route are not implemented.
 - [ ] Implement the schema and route in the files above. Generate the code server-side with `uuid.uuid4().hex`; write item/state/event/BarcodeLookup changes in one transaction; handle a unique collision by rolling back and returning a safe server error rather than replacing another row. For existing inventory items, add `quantity_estimate` to the current count. Set `source="manual"` and store `package_description` as the barcode quantity label.
 - [ ] Re-run the focused backend test and full `cd backend && .venv312/bin/pytest -q`; all pass.
-- [ ] Commit the backend slice with `git add backend/app/models/schemas.py backend/app/api/routes/barcode.py backend/tests/test_barcode_labels.py && git commit -m "feat: create internal pantry barcode labels"`.
+- [ ] Commit the backend slice and its executable-plan correction with `git add backend/app/models/schemas.py backend/app/api/routes/barcode.py backend/tests/test_barcode_labels.py docs/superpowers/plans/2026-11-20-pantry-custom-barcode-labels.md && git commit -m "feat: create internal pantry barcode labels"`.
 
 ## Task 2: Barcode label UI, print, docs, and visual QA
 
