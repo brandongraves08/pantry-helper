@@ -207,6 +207,11 @@ export const addBarcodeToInventory = async (payload) => {
   return data
 }
 
+export const createBarcodeLabel = async (payload) => {
+  const { data } = await apiClient.post('/v1/barcode/create-label', payload)
+  return data
+}
+
 // ── Detections API (per-item vision review) ────────────────────────
 
 export const listDetections = async (captureId) => {

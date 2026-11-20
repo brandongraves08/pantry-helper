@@ -27,6 +27,18 @@ A battery-powered, event-driven pantry inventory system using ESP32 camera, Open
 - **Emergency plan** — standalone 90-day food and water preparedness guide with locally saved checklist progress; plan targets are separate from pantry stock and shopping data
 - **Prepping gear** — separate saved inventory for emergency equipment and supplies, searchable by item, category, location, and notes
 
+## Custom pantry barcode labels
+
+On **Scan Barcode**, choose **Make a Pantry Label**, enter the item name, optional package description (for example, `1 lb bag`), and number of packages. Creating the label adds that package count to inventory and generates a local Code 128 barcode with a label date. Print at actual size, then attach a copy to each like-for-like package; use the print dialog's copies setting when needed.
+
+These `PH-…` codes are private identifiers for this Pantry Helper database. They are not UPC/EAN retail barcodes and will not resolve in another Pantry Helper database. Package count is a count of packages, not their weight. The app prints one label per creation; it does not provide label-sheet or bulk-print layouts.
+
+Desktop and phone views of the running label flow (local QA data):
+
+![Custom pantry barcode label at desktop size](docs/screenshots/barcode-labels/desktop.png)
+
+![Custom pantry barcode label at phone size](docs/screenshots/barcode-labels/mobile.png)
+
 ## Quick Start
 
 ### Docker (Fastest)
