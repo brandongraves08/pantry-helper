@@ -1,8 +1,15 @@
 import re
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
 
 import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine, event
+from sqlalchemy.orm import Session, sessionmaker
 
+from app.db.database import Base, get_db
 from app.db.models import BarcodeLookup, InventoryEvent, InventoryItem, InventoryState
+from app.main import app
 from app.middleware import api_auth
 from app.api.routes import barcode as barcode_routes
 
@@ -131,3 +138,51 @@ def test_scanning_internal_barcode_uses_local_cache_without_changing_count(clien
     assert result["quantity"] == "1 lb bag"
     assert result["label_created_at"]
     assert state.count_estimate == 1
+
+
+def test_concurrent_label_creations_do_not_lose_inventory_increment(tmp_path, monkeypatch):
+    engine = create_engine(
+        f"sqlite:///{tmp_path / 'concurrent-labels.db'}",
+        connect_args={"check_same_thread": False, "timeout": 20},
+    )
+    Base.metadata.create_all(engine)
+    session_factory = sessionmaker(bind=engine, autocommit=False, autoflush=False)
+    with session_factory() as db:
+        item = InventoryItem(canonical_name="White rice")
+        db.add(item)
+        db.flush()
+        db.add(InventoryState(item_id=item.id, count_estimate=4, confidence=1.0, is_manual=True))
+        db.commit()
+
+    update_barrier = Barrier(2)
+
+    def synchronize_loaded_state(session, instance):
+        if isinstance(instance, InventoryState):
+            update_barrier.wait(timeout=10)
+
+    event.listen(Session, "loaded_as_persistent", synchronize_loaded_state)
+
+    def override_get_db():
+        with session_factory() as db:
+            yield db
+
+    monkeypatch.setitem(app.dependency_overrides, get_db, override_get_db)
+
+    def create_one_label(_):
+        with TestClient(app) as client:
+            return client.post(
+                "/v1/barcode/create-label",
+                json={"product_name": "White rice", "quantity_estimate": 1},
+            )
+
+    try:
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            responses = list(pool.map(create_one_label, range(2)))
+    finally:
+        event.remove(Session, "loaded_as_persistent", synchronize_loaded_state)
+
+    assert [response.status_code for response in responses] == [200, 200]
+    with session_factory() as db:
+        state = db.query(InventoryState).one()
+        assert state.count_estimate == 6
+    engine.dispose()

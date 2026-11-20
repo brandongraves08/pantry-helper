@@ -9,6 +9,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -57,7 +58,9 @@ async def create_barcode_label(
             InventoryState.item_id == item.id
         ).first()
         if state:
-            state.count_estimate = (state.count_estimate or 0) + request.quantity_estimate
+            state.count_estimate = (
+                func.coalesce(InventoryState.count_estimate, 0) + request.quantity_estimate
+            )
             state.confidence = 1.0
             state.is_manual = True
             state.last_seen_at = now
