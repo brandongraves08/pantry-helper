@@ -140,7 +140,10 @@ def test_scanning_internal_barcode_uses_local_cache_without_changing_count(clien
     assert state.count_estimate == 1
 
 
-def test_concurrent_label_creation_initializes_missing_inventory_state_once(tmp_path, monkeypatch):
+@pytest.mark.parametrize("initial_count", [None, 4])
+def test_concurrent_label_creation_serializes_inventory_state_writes(
+    tmp_path, monkeypatch, initial_count
+):
     engine = create_engine(
         f"sqlite:///{tmp_path / 'concurrent-labels.db'}",
         connect_args={"check_same_thread": False, "timeout": 20},
@@ -150,30 +153,44 @@ def test_concurrent_label_creation_initializes_missing_inventory_state_once(tmp_
     with session_factory() as db:
         item = InventoryItem(canonical_name="White rice")
         db.add(item)
+        db.flush()
+        if initial_count is not None:
+            db.add(
+                InventoryState(
+                    item_id=item.id,
+                    count_estimate=initial_count,
+                    confidence=1.0,
+                    is_manual=True,
+                )
+            )
         db.commit()
         item_id = item.id
 
-    first_state_insert_entered = Event()
-    release_first_state_insert = Event()
-    second_state_insert_entered = Event()
-    state_insert_lock = Lock()
-    state_insert_count = 0
+    first_state_write_entered = Event()
+    release_first_state_write = Event()
+    second_state_write_entered = Event()
+    state_write_lock = Lock()
+    state_write_count = 0
 
-    def synchronize_state_inserts(conn, cursor, statement, parameters, context, executemany):
-        nonlocal state_insert_count
-        if not statement.lstrip().lower().startswith("insert into inventory_state"):
+    def synchronize_state_writes(conn, cursor, statement, parameters, context, executemany):
+        nonlocal state_write_count
+        normalized_statement = statement.lstrip().lower()
+        if not (
+            normalized_statement.startswith("insert into inventory_state")
+            or normalized_statement.startswith("update inventory_state")
+        ):
             return
-        with state_insert_lock:
-            state_insert_count += 1
-            insert_number = state_insert_count
-        if insert_number == 1:
-            first_state_insert_entered.set()
-            if not release_first_state_insert.wait(timeout=10):
-                raise TimeoutError("Test did not release the first inventory-state insert")
+        with state_write_lock:
+            state_write_count += 1
+            write_number = state_write_count
+        if write_number == 1:
+            first_state_write_entered.set()
+            if not release_first_state_write.wait(timeout=10):
+                raise TimeoutError("Test did not release the first inventory-state write")
         else:
-            second_state_insert_entered.set()
+            second_state_write_entered.set()
 
-    event.listen(engine, "before_cursor_execute", synchronize_state_inserts)
+    event.listen(engine, "before_cursor_execute", synchronize_state_writes)
 
     dependency_lock = Lock()
     database_dependency_calls = 0
@@ -200,17 +217,17 @@ def test_concurrent_label_creation_initializes_missing_inventory_state_once(tmp_
     try:
         with ThreadPoolExecutor(max_workers=2) as pool:
             first_response = pool.submit(create_one_label, 1)
-            assert first_state_insert_entered.wait(timeout=5)
+            assert first_state_write_entered.wait(timeout=5)
             second_response = pool.submit(create_one_label, 2)
             assert second_database_dependency_started.wait(timeout=5)
-            second_insert_raced = second_state_insert_entered.wait(timeout=2)
-            release_first_state_insert.set()
+            second_write_raced = second_state_write_entered.wait(timeout=2)
+            release_first_state_write.set()
             responses = [first_response.result(timeout=10), second_response.result(timeout=10)]
     finally:
-        release_first_state_insert.set()
-        event.remove(engine, "before_cursor_execute", synchronize_state_inserts)
+        release_first_state_write.set()
+        event.remove(engine, "before_cursor_execute", synchronize_state_writes)
 
-    assert second_insert_raced is False
+    assert second_write_raced is False
     assert [response.status_code for response in responses] == [200, 200]
     with session_factory() as db:
         states = db.query(InventoryState).filter(
@@ -218,5 +235,5 @@ def test_concurrent_label_creation_initializes_missing_inventory_state_once(tmp_
             InventoryState.location_id.is_(None),
         ).all()
         assert len(states) == 1
-        assert states[0].count_estimate == 2
+        assert states[0].count_estimate == (initial_count or 0) + 2
     engine.dispose()
