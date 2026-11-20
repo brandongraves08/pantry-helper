@@ -1,11 +1,11 @@
 import re
 from concurrent.futures import ThreadPoolExecutor
-from threading import Barrier
+from threading import Event, Lock
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, event
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import sessionmaker
 
 from app.db.database import Base, get_db
 from app.db.models import BarcodeLookup, InventoryEvent, InventoryItem, InventoryState
@@ -140,7 +140,7 @@ def test_scanning_internal_barcode_uses_local_cache_without_changing_count(clien
     assert state.count_estimate == 1
 
 
-def test_concurrent_label_creations_do_not_lose_inventory_increment(tmp_path, monkeypatch):
+def test_concurrent_label_creation_initializes_missing_inventory_state_once(tmp_path, monkeypatch):
     engine = create_engine(
         f"sqlite:///{tmp_path / 'concurrent-labels.db'}",
         connect_args={"check_same_thread": False, "timeout": 20},
@@ -150,19 +150,41 @@ def test_concurrent_label_creations_do_not_lose_inventory_increment(tmp_path, mo
     with session_factory() as db:
         item = InventoryItem(canonical_name="White rice")
         db.add(item)
-        db.flush()
-        db.add(InventoryState(item_id=item.id, count_estimate=4, confidence=1.0, is_manual=True))
         db.commit()
+        item_id = item.id
 
-    update_barrier = Barrier(2)
+    first_state_insert_entered = Event()
+    release_first_state_insert = Event()
+    second_state_insert_entered = Event()
+    state_insert_lock = Lock()
+    state_insert_count = 0
 
-    def synchronize_loaded_state(session, instance):
-        if isinstance(instance, InventoryState):
-            update_barrier.wait(timeout=10)
+    def synchronize_state_inserts(conn, cursor, statement, parameters, context, executemany):
+        nonlocal state_insert_count
+        if not statement.lstrip().lower().startswith("insert into inventory_state"):
+            return
+        with state_insert_lock:
+            state_insert_count += 1
+            insert_number = state_insert_count
+        if insert_number == 1:
+            first_state_insert_entered.set()
+            if not release_first_state_insert.wait(timeout=10):
+                raise TimeoutError("Test did not release the first inventory-state insert")
+        else:
+            second_state_insert_entered.set()
 
-    event.listen(Session, "loaded_as_persistent", synchronize_loaded_state)
+    event.listen(engine, "before_cursor_execute", synchronize_state_inserts)
+
+    dependency_lock = Lock()
+    database_dependency_calls = 0
+    second_database_dependency_started = Event()
 
     def override_get_db():
+        nonlocal database_dependency_calls
+        with dependency_lock:
+            database_dependency_calls += 1
+            if database_dependency_calls == 2:
+                second_database_dependency_started.set()
         with session_factory() as db:
             yield db
 
@@ -177,12 +199,24 @@ def test_concurrent_label_creations_do_not_lose_inventory_increment(tmp_path, mo
 
     try:
         with ThreadPoolExecutor(max_workers=2) as pool:
-            responses = list(pool.map(create_one_label, range(2)))
+            first_response = pool.submit(create_one_label, 1)
+            assert first_state_insert_entered.wait(timeout=5)
+            second_response = pool.submit(create_one_label, 2)
+            assert second_database_dependency_started.wait(timeout=5)
+            second_insert_raced = second_state_insert_entered.wait(timeout=2)
+            release_first_state_insert.set()
+            responses = [first_response.result(timeout=10), second_response.result(timeout=10)]
     finally:
-        event.remove(Session, "loaded_as_persistent", synchronize_loaded_state)
+        release_first_state_insert.set()
+        event.remove(engine, "before_cursor_execute", synchronize_state_inserts)
 
+    assert second_insert_raced is False
     assert [response.status_code for response in responses] == [200, 200]
     with session_factory() as db:
-        state = db.query(InventoryState).one()
-        assert state.count_estimate == 6
+        states = db.query(InventoryState).filter(
+            InventoryState.item_id == item_id,
+            InventoryState.location_id.is_(None),
+        ).all()
+        assert len(states) == 1
+        assert states[0].count_estimate == 2
     engine.dispose()

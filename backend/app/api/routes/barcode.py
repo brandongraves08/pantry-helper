@@ -46,16 +46,26 @@ async def create_barcode_label(
     barcode = _generate_internal_barcode()
 
     try:
-        item = db.query(InventoryItem).filter(
+        dialect = db.get_bind().dialect.name
+        if dialect == "sqlite":
+            # SQLite ignores SELECT ... FOR UPDATE; acquire its write lock before
+            # checking for a missing state row so concurrent label requests serialize.
+            db.connection().exec_driver_sql("BEGIN IMMEDIATE")
+
+        item_query = db.query(InventoryItem).filter(
             InventoryItem.canonical_name == request.product_name
-        ).first()
+        )
+        if dialect != "sqlite":
+            item_query = item_query.with_for_update()
+        item = item_query.first()
         if not item:
             item = InventoryItem(canonical_name=request.product_name, heb_status="pending")
             db.add(item)
             db.flush()
 
         state = db.query(InventoryState).filter(
-            InventoryState.item_id == item.id
+            InventoryState.item_id == item.id,
+            InventoryState.location_id.is_(None),
         ).first()
         if state:
             state.count_estimate = (
