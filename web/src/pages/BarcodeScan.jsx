@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
-import { Barcode, Package, Plus, Link, Search, Check, X, Camera, AlertCircle, Loader, Smartphone } from 'lucide-react';
+import JsBarcode from 'jsbarcode';
+import { Barcode, Package, Plus, Link, Search, Check, X, Camera, AlertCircle, Loader, Smartphone, Printer } from 'lucide-react';
 import * as api from '../api/client';
 import CameraScanner from '../components/CameraScanner';
 
@@ -15,6 +16,7 @@ export default function BarcodeScan() {
   const [linkTarget, setLinkTarget] = useState('');
   const [linking, setLinking] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
+  const [showLabelForm, setShowLabelForm] = useState(false);
   const inputRef = useRef(null);
 
   // Auto-focus input on mount
@@ -104,9 +106,20 @@ export default function BarcodeScan() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Barcode Scanner</h2>
+        <button
+          type="button"
+          onClick={() => setShowLabelForm((visible) => !visible)}
+          aria-expanded={showLabelForm}
+          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-blue-600 px-4 py-2.5 font-medium text-blue-700 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+        >
+          <Plus size={18} />
+          {showLabelForm ? 'Close label form' : 'Make a Pantry Label'}
+        </button>
       </div>
+
+      {showLabelForm && <BarcodeLabelForm />}
 
       {/* Scan Input */}
       <div className="bg-white p-4 sm:p-6 rounded-xl border shadow-sm">
@@ -123,7 +136,7 @@ export default function BarcodeScan() {
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
+          <div className="relative min-w-0 flex-1">
             <Barcode size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               ref={inputRef}
@@ -132,7 +145,7 @@ export default function BarcodeScan() {
               value={barcodeInput}
               onChange={(e) => setBarcodeInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              className="w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg"
+              className="w-full min-w-0 pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 text-sm"
             />
           </div>
           <div className="flex gap-2 sm:gap-3">
@@ -402,5 +415,149 @@ function NutritionBadge({ label, value }) {
       <p className="text-xs text-gray-500">{label}</p>
       <p className="text-lg font-semibold text-gray-800">{value}</p>
     </div>
+  );
+}
+
+function BarcodeLabelForm() {
+  const [itemName, setItemName] = useState('');
+  const [packageDescription, setPackageDescription] = useState('');
+  const [packageCount, setPackageCount] = useState('1');
+  const [label, setLabel] = useState(null);
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const barcodeSvgRef = useRef(null);
+
+  useEffect(() => {
+    if (!label || !barcodeSvgRef.current) return;
+    try {
+      JsBarcode(barcodeSvgRef.current, label.barcode, {
+        format: 'CODE128',
+        displayValue: false,
+        lineColor: '#111827',
+        background: '#ffffff',
+        width: 1.35,
+        height: 64,
+        margin: 18,
+      });
+    } catch {
+      setError('The saved label could not be rendered. You can retry by creating it again.');
+    }
+  }, [label]);
+
+  const handleCreate = async (event) => {
+    event.preventDefault();
+    const name = itemName.trim();
+    const count = Number(packageCount);
+    if (!name || !Number.isInteger(count) || count < 1) return;
+
+    setSaving(true);
+    setError('');
+    setLabel(null);
+    try {
+      const created = await api.createBarcodeLabel({
+        product_name: name,
+        package_description: packageDescription.trim() || null,
+        quantity_estimate: count,
+      });
+      setLabel(created);
+    } catch (err) {
+      setError(err.response?.data?.detail || err.message || 'Could not save pantry label. Check your connection and try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const labelDate = label ? new Date(label.label_created_at) : null;
+  const formattedDate = labelDate && !Number.isNaN(labelDate.getTime())
+    ? new Intl.DateTimeFormat(undefined, { year: 'numeric', month: 'short', day: 'numeric' }).format(labelDate)
+    : '';
+
+  return (
+    <section className="rounded-xl border bg-white p-4 shadow-sm sm:p-6" aria-labelledby="make-label-heading">
+      <div className="mb-5">
+        <h3 id="make-label-heading" className="font-semibold text-gray-900">Create a pantry barcode</h3>
+        <p className="mt-1 text-sm text-gray-600">
+          Save your packed food, then print a Pantry Helper-only barcode for scanning later.
+        </p>
+      </div>
+
+      <form onSubmit={handleCreate} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="sm:col-span-2">
+          <label htmlFor="label-item-name" className="mb-1 block text-sm font-medium text-gray-800">Item name</label>
+          <input
+            id="label-item-name"
+            type="text"
+            autoComplete="off"
+            required
+            maxLength={160}
+            value={itemName}
+            onChange={(event) => { setItemName(event.target.value); setLabel(null); }}
+            className="w-full rounded-lg border px-3 py-3 text-base focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+          />
+        </div>
+        <div>
+          <label htmlFor="label-package-description" className="mb-1 block text-sm font-medium text-gray-800">
+            Package description <span className="font-normal text-gray-500">(optional)</span>
+          </label>
+          <input
+            id="label-package-description"
+            type="text"
+            maxLength={120}
+            placeholder="e.g. 1 lb bag"
+            value={packageDescription}
+            onChange={(event) => { setPackageDescription(event.target.value); setLabel(null); }}
+            className="w-full rounded-lg border px-3 py-3 text-base focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+          />
+        </div>
+        <div>
+          <label htmlFor="label-package-count" className="mb-1 block text-sm font-medium text-gray-800">Packages</label>
+          <input
+            id="label-package-count"
+            type="number"
+            min="1"
+            step="1"
+            required
+            inputMode="numeric"
+            value={packageCount}
+            onChange={(event) => { setPackageCount(event.target.value); setLabel(null); }}
+            className="w-full rounded-lg border px-3 py-3 text-base focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+          />
+        </div>
+        <div className="sm:col-span-2">
+          <button
+            type="submit"
+            disabled={saving || !itemName.trim() || !Number.isInteger(Number(packageCount)) || Number(packageCount) < 1}
+            className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 py-3 font-medium text-white hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+          >
+            {saving ? <><Loader size={18} className="animate-spin" /> Saving label…</> : 'Create label'}
+          </button>
+        </div>
+      </form>
+
+      {error && <p role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</p>}
+
+      {label && (
+        <div className="mt-6 border-t pt-5">
+          <div id="pantry-barcode-label" className="barcode-label-print mx-auto w-full max-w-md rounded-lg border border-gray-300 bg-white p-4 text-gray-900">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">Pantry Helper</p>
+            <h4 className="mt-1 break-words text-lg font-bold leading-tight">{label.item_name}</h4>
+            {label.package_description && <p className="mt-1 break-words text-sm text-gray-700">{label.package_description}</p>}
+            <p className="mt-1 text-xs text-gray-600">Labeled {formattedDate}</p>
+            <svg ref={barcodeSvgRef} role="img" aria-label="Code 128 barcode" className="mt-2 block h-auto w-full" />
+            <p className="mt-1 break-all text-center font-mono text-xs">{label.barcode}</p>
+          </div>
+          <div className="no-print mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-gray-600">Print at actual size and attach a copy to each like-for-like package; set copies in your print dialog if needed.</p>
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-blue-600 px-4 py-2.5 font-medium text-blue-700 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+            >
+              <Printer size={18} /> Print label
+            </button>
+          </div>
+        </div>
+      )}
+    </section>
   );
 }

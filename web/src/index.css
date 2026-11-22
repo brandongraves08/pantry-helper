@@ -172,6 +172,46 @@ body {
   }
 }
 
+@media print {
+  @page {
+    margin: 10mm;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+  }
+
+  body * {
+    visibility: hidden !important;
+  }
+
+  #pantry-barcode-label,
+  #pantry-barcode-label * {
+    visibility: visible !important;
+  }
+
+  #pantry-barcode-label {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 95mm !important;
+    max-width: none !important;
+    padding: 3mm !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+
+  #pantry-barcode-label svg {
+    max-height: 18mm;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+}
+
 /* Safe area padding for notched iPhones (used with PWA viewport-fit=cover) */
 .pt-safe {
   padding-top: env(safe-area-inset-top, 0px);
